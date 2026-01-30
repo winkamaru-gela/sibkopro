@@ -15,10 +15,10 @@ import {
   BrainCircuit, PlusCircle, List, Printer, X, Settings, 
   Image as ImageIcon, BarChart2, TrendingUp, Lock, UserCheck, Key,
   Phone, MapPin, Calendar, User, Eye, Check, Clock, Bookmark, FileSpreadsheet, RefreshCcw, File,
-  AlertOctagon, PieChart, UserCog, CalendarDays
+  AlertOctagon, PieChart, UserCog, CalendarDays, TrendingDown, FileCheck, Layers
 } from 'lucide-react';
 
-// --- Firebase Configuration (UPDATED) ---
+// --- Firebase Configuration ---
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -46,7 +46,7 @@ const INITIAL_ADMIN = {
     fullName: 'Administrator SIBKO',
     role: 'admin',
     createdAt: new Date().toISOString(),
-    accessExpiry: null // Admin always full access
+    accessExpiry: null 
 };
 
 const ACCESS_OPTIONS = [
@@ -90,7 +90,6 @@ const getCollectionRef = (collName) => collection(db, collName);
 const formatIndoDate = (dateString) => {
     if (!dateString) return '-';
     try {
-        // Handle Firestore Timestamp if passed directly
         if (dateString && typeof dateString === 'object' && dateString.seconds) {
             return new Date(dateString.seconds * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         }
@@ -133,18 +132,16 @@ const parseImportDate = (dateStr) => {
     return '';
 };
 
-// Generate random credentials
 const generateCredentials = (name) => {
     const cleanName = name.replace(/[^a-zA-Z]/g, '').toLowerCase().substring(0, 6);
     const randNum = Math.floor(1000 + Math.random() * 9000);
     const username = `${cleanName}${randNum}`;
-    const password = Math.random().toString(36).slice(-8); // 8 char random
+    const password = Math.random().toString(36).slice(-8); 
     return { username, password };
 };
 
-// Calculate Expiry Date
 const calculateExpiry = (days) => {
-    if (parseInt(days) === -1) return null; // Full time
+    if (parseInt(days) === -1) return null; 
     const date = new Date();
     date.setDate(date.getDate() + parseInt(days));
     return date.toISOString();
@@ -152,7 +149,6 @@ const calculateExpiry = (days) => {
 
 // --- Components ---
 
-// 1. LOGIN PAGE
 const LoginPage = ({ onLogin, loading, error }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -228,7 +224,6 @@ const LoginPage = ({ onLogin, loading, error }) => {
     );
 };
 
-// 2. ADMIN DASHBOARD
 const AdminDashboard = ({ users, studentsCount, journalsCount }) => {
     return (
         <div className="p-6 space-y-6 animate-in fade-in">
@@ -260,33 +255,28 @@ const AdminDashboard = ({ users, studentsCount, journalsCount }) => {
 
             <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded shadow-sm">
                 <h3 className="font-bold text-blue-800 mb-2">Informasi Sistem</h3>
-                <p className="text-sm text-blue-700">Sebagai Admin, Anda memiliki akses untuk mengelola akun pengguna (Guru BK). Anda dapat mengatur masa aktif akun guru (trial/full time). Anda tidak dapat melihat detail konseling siswa demi menjaga privasi.</p>
+                <p className="text-sm text-blue-700">Sebagai Admin, Anda memiliki akses untuk mengelola akun pengguna (Guru BK) dan mengubah password Admin sendiri. Anda dapat mengatur masa aktif akun guru (trial/full time).</p>
             </div>
         </div>
     );
 };
 
-// 2b. GURU DASHBOARD (RE-ADDED & FIXED)
 const GuruDashboard = ({ students, journals }) => {
-    // Stats Calculations
     const highRiskStudents = useMemo(() => students.filter(s => s.riskLevel === 'HIGH'), [students]);
     const mediumRiskStudents = useMemo(() => students.filter(s => s.riskLevel === 'MEDIUM'), [students]);
     
-    // Journal Stats for Current Month
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const currentMonth = new Date().toISOString().slice(0, 7); 
     const monthlyJournals = useMemo(() => journals.filter(j => j.date.startsWith(currentMonth)), [journals, currentMonth]);
     
-    // Problem Distribution Logic
     const problemStats = useMemo(() => {
         const stats = {};
         journals.forEach(j => {
             const key = j.serviceType || 'Lainnya';
             stats[key] = (stats[key] || 0) + 1;
         });
-        return Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 5); // Top 5
+        return Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 5); 
     }, [journals]);
 
-    // Robust Sort function for mixed Date/Timestamp/String types
     const sortJournals = (list) => {
         return [...list].sort((a, b) => {
             const tA = a.createdAt?.seconds ? a.createdAt.seconds : new Date(a.createdAt || a.date).getTime()/1000;
@@ -306,7 +296,6 @@ const GuruDashboard = ({ students, journals }) => {
                 </div>
             </div>
 
-            {/* 1. KARTU STATISTIK UTAMA */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-32 hover:border-blue-400 transition-colors">
                     <div className="flex justify-between items-start">
@@ -354,7 +343,6 @@ const GuruDashboard = ({ students, journals }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* 2. EARLY WARNING SYSTEM */}
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
                     <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
                         <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -370,7 +358,7 @@ const GuruDashboard = ({ students, journals }) => {
                                         <th className="p-2">Nama Siswa</th>
                                         <th className="p-2">Kelas</th>
                                         <th className="p-2">Wali</th>
-                                        <th className="p-2 text-right">Aksi</th>
+                                        <th className="p-2 text-right">Info</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -380,7 +368,7 @@ const GuruDashboard = ({ students, journals }) => {
                                             <td className="p-2 text-slate-600">{s.class}</td>
                                             <td className="p-2 text-slate-500 text-xs">{s.parent || '-'}</td>
                                             <td className="p-2 text-right">
-                                                <button className="text-xs bg-white border border-slate-300 px-2 py-1 rounded hover:bg-blue-50 text-blue-600">Lihat</button>
+                                                <span className="text-xs text-red-500 font-bold">URGENT</span>
                                             </td>
                                         </tr>
                                     ))}
@@ -395,7 +383,6 @@ const GuruDashboard = ({ students, journals }) => {
                     </div>
                 </div>
 
-                {/* 3. DISTRIBUSI LAYANAN */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
                     <div className="p-4 border-b bg-slate-50 rounded-t-xl">
                         <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -425,7 +412,6 @@ const GuruDashboard = ({ students, journals }) => {
                 </div>
             </div>
 
-            {/* 4. RECENT ACTIVITY */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Clock size={18} className="text-slate-400"/> Aktivitas Terakhir</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -446,12 +432,10 @@ const GuruDashboard = ({ students, journals }) => {
     );
 };
 
-// 3. ADMIN USER MANAGEMENT (UPDATED)
 const AdminUserManagement = ({ users }) => {
     const [form, setForm] = useState({ username: '', password: '', fullName: '', duration: 30 });
     const [editingId, setEditingId] = useState(null);
     
-    // Auto generate credentials when name changes (only in add mode)
     const handleNameChange = (val) => {
         const newData = { ...form, fullName: val };
         if (!editingId && val.length > 3) {
@@ -481,7 +465,6 @@ const AdminUserManagement = ({ users }) => {
                 await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.users), editingId), userData);
                 alert("Data guru berhasil diperbarui.");
             } else {
-                // Check duplicate only for new users
                 if(users.some(u => u.username === form.username)) return alert("Username sudah digunakan!");
                 
                 await addDoc(getCollectionRef(COLLECTION_PATHS.users), {
@@ -499,12 +482,11 @@ const AdminUserManagement = ({ users }) => {
 
     const handleEdit = (user) => {
         setEditingId(user.id);
-        // Estimate duration is tricky, just set to custom or keep expiry null
         setForm({
             fullName: user.fullName,
             username: user.username,
             password: user.password,
-            duration: user.accessExpiry ? 30 : -1 // Default to 30 if has expiry, or fulltime
+            duration: user.accessExpiry ? 30 : -1 
         });
     };
 
@@ -535,7 +517,6 @@ const AdminUserManagement = ({ users }) => {
             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Shield size={24}/> Manajemen Pengguna (Guru BK)</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Form Tambah/Edit */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
                     <div className="flex justify-between items-center border-b pb-2 mb-4">
                         <h3 className="font-bold text-blue-600">{editingId ? 'Edit Data Guru' : 'Tambah Guru Baru'}</h3>
@@ -575,7 +556,6 @@ const AdminUserManagement = ({ users }) => {
                     </form>
                 </div>
 
-                {/* List User */}
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 bg-slate-50 border-b font-bold text-slate-700">Daftar Guru BK Aktif</div>
                     <div className="overflow-x-auto">
@@ -629,9 +609,8 @@ const AdminUserManagement = ({ users }) => {
     );
 };
 
-// 4. GURU COMPONENTS
-// --- GURU ACCOUNT SETTINGS (NEW) ---
-const GuruAccount = ({ user, onUpdatePassword }) => {
+// 4. SHARED/GURU COMPONENTS
+const AccountSettings = ({ user, onUpdatePassword }) => {
     const [password, setPassword] = useState(user.password || '');
     const [fullName, setFullName] = useState(user.fullName || '');
 
@@ -643,7 +622,7 @@ const GuruAccount = ({ user, onUpdatePassword }) => {
     }
 
     return (
-        <div className="p-6 max-w-2xl mx-auto">
+        <div className="p-6 max-w-2xl mx-auto animate-in fade-in">
             <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-4 mb-6 border-b pb-4">
                     <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl">
@@ -651,7 +630,7 @@ const GuruAccount = ({ user, onUpdatePassword }) => {
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">Profil & Akun Saya</h2>
-                        <p className="text-sm text-slate-500">Kelola informasi login Anda</p>
+                        <p className="text-sm text-slate-500">Kelola informasi login Anda ({user.role === 'admin' ? 'Administrator' : 'Guru BK'})</p>
                     </div>
                 </div>
 
@@ -675,12 +654,14 @@ const GuruAccount = ({ user, onUpdatePassword }) => {
                         </div>
                     </div>
 
-                    <div className="bg-blue-50 p-4 rounded text-sm text-blue-800 flex gap-2">
-                        <CalendarDays size={20}/>
-                        <div>
-                            <span className="font-bold">Status Akun:</span> {user.accessExpiry ? `Berlaku hingga ${formatIndoDate(user.accessExpiry)}` : 'Full Time (Permanen)'}
+                    {user.role === 'guru' && (
+                        <div className="bg-blue-50 p-4 rounded text-sm text-blue-800 flex gap-2">
+                            <CalendarDays size={20}/>
+                            <div>
+                                <span className="font-bold">Status Akun:</span> {user.accessExpiry ? `Berlaku hingga ${formatIndoDate(user.accessExpiry)}` : 'Full Time (Permanen)'}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <div className="pt-4">
                         <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
@@ -693,7 +674,6 @@ const GuruAccount = ({ user, onUpdatePassword }) => {
     );
 }
 
-// --- STUDENT MANAGER ---
 const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport }) => {
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
@@ -1032,8 +1012,8 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport 
     );
 };
 
-// --- JOURNAL COMPONENT ---
-const Journal = ({ students, journals, onAdd, onUpdate }) => {
+// --- UPGRADED JOURNAL COMPONENT WITH SEMESTER TAGGING ---
+const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
     const [selectedStudents, setSelectedStudents] = useState([]);
     const [searchStudent, setSearchStudent] = useState('');
     const [editingId, setEditingId] = useState(null);
@@ -1047,6 +1027,7 @@ const Journal = ({ students, journals, onAdd, onUpdate }) => {
         description: '', 
         processEval: '',
         resultEval: '',
+        category: MASALAH_KATEGORI[0],
         followUp: 'Selesai' 
     });
 
@@ -1076,6 +1057,7 @@ const Journal = ({ students, journals, onAdd, onUpdate }) => {
             time: journal.time || '',
             place: journal.place || '',
             serviceType: journal.serviceType,
+            category: journal.category || MASALAH_KATEGORI[0],
             skkpd: journal.skkpd || '',
             technique: journal.technique || '',
             description: journal.description || '',
@@ -1100,6 +1082,7 @@ const Journal = ({ students, journals, onAdd, onUpdate }) => {
         setForm({ 
             date: new Date().toISOString().slice(0,10), description: '', 
             processEval: '', resultEval: '', time: '', place: '', technique: '', 
+            category: MASALAH_KATEGORI[0],
             serviceType: LAYANAN_TYPES[0], skkpd: '', followUp: 'Selesai'
         });
         setSelectedStudents([]);
@@ -1115,7 +1098,10 @@ const Journal = ({ students, journals, onAdd, onUpdate }) => {
             studentIds: selectedStudents.map(s => s.id),
             studentNames: selectedStudents.map(s => s.name),
             studentName: selectedStudents.length === 1 ? selectedStudents[0].name : `${selectedStudents.length} Siswa`,
-            result: form.resultEval 
+            result: form.resultEval,
+            // AUTO TAGGING SEMESTER
+            academicYear: settings?.academicYear || '2024/2025',
+            semester: settings?.semester || 'Ganjil'
         };
         
         if (editingId) {
@@ -1133,168 +1119,209 @@ const Journal = ({ students, journals, onAdd, onUpdate }) => {
     );
 
     return (
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-100px)] overflow-hidden">
-            <div className="lg:col-span-5 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
-                <div className={`p-4 text-white flex justify-between items-center ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+        <div className="p-6 space-y-6 h-full overflow-y-auto">
+            {/* TOP: FORM INPUT - Full Width */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                <div className={`p-4 text-white flex justify-between items-center rounded-t-xl ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
                     <h3 className="font-bold flex items-center gap-2"><BookOpen size={20}/> {editingId ? 'Edit Jurnal Layanan' : 'Input Jurnal Layanan'}</h3>
+                    <div className="text-xs bg-white/20 px-3 py-1 rounded">
+                        {settings?.semester ? `${settings.semester} ${settings.academicYear}` : 'Semester Default'}
+                    </div>
                     {editingId && (
-                        <button onClick={resetForm} className="bg-white/20 hover:bg-white/30 text-white text-xs px-2 py-1 rounded">Batal Edit</button>
+                        <button onClick={resetForm} className="bg-white/20 hover:bg-white/30 text-white text-xs px-2 py-1 rounded ml-2">Batal Edit</button>
                     )}
                 </div>
                 
-                <div className="p-6 overflow-y-auto flex-1">
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Tanggal</label>
-                                <input type="date" className="w-full p-2 border rounded text-sm" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} required/>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Waktu (Jam Ke-)</label>
-                                <input type="text" className="w-full p-2 border rounded text-sm" placeholder="Contoh: 3-4 / 09.00" value={form.time} onChange={e=>setForm({...form, time:e.target.value})} />
-                            </div>
-                        </div>
+                <div className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tanggal</label>
+                                        <input type="date" className="w-full p-2 border rounded text-sm" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} required/>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Waktu (Jam Ke-)</label>
+                                        <input type="text" className="w-full p-2 border rounded text-sm" placeholder="Contoh: 3-4" value={form.time} onChange={e=>setForm({...form, time:e.target.value})} />
+                                    </div>
+                                </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="col-span-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Jenis Layanan</label>
-                                <select className="w-full p-2 border rounded text-sm font-bold text-blue-700 bg-blue-50" value={form.serviceType} onChange={e=> { setForm({...form, serviceType:e.target.value}); setSelectedStudents([]); }}>
-                                    {LAYANAN_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
-                                </select>
-                            </div>
-                            <div className="col-span-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Tempat Layanan</label>
-                                <input className="w-full p-2 border rounded text-sm" placeholder="Contoh: Ruang BK / Kelas X-1" value={form.place} onChange={e=>setForm({...form, place:e.target.value})} />
-                            </div>
-                        </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="col-span-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Jenis Layanan</label>
+                                        <select className="w-full p-2 border rounded text-sm font-bold text-blue-700 bg-blue-50" value={form.serviceType} onChange={e=> { setForm({...form, serviceType:e.target.value}); setSelectedStudents([]); }}>
+                                            {LAYANAN_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tempat Layanan</label>
+                                        <input className="w-full p-2 border rounded text-sm" placeholder="Contoh: Ruang BK" value={form.place} onChange={e=>setForm({...form, place:e.target.value})} />
+                                    </div>
+                                </div>
 
-                        <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Sasaran Siswa / Konseli</label>
-                            
-                            {isClassical ? (
-                                <select className="w-full p-2 border rounded text-sm bg-white mb-2" onChange={(e) => handleClassSelect(e.target.value)}>
-                                    <option value="">-- Pilih Kelas --</option>
-                                    {classes.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            ) : (
-                                <div className="relative mb-2">
-                                    <Search className="absolute left-2 top-2.5 text-slate-400" size={16}/>
-                                    <input 
-                                        className="w-full pl-8 p-2 border rounded text-sm" 
-                                        placeholder="Ketik nama siswa..." 
-                                        value={searchStudent}
-                                        onChange={e=>setSearchStudent(e.target.value)}
-                                    />
-                                    {searchStudent && (
-                                        <div className="absolute z-10 w-full bg-white border shadow-lg max-h-40 overflow-y-auto mt-1 rounded">
-                                            {studentSuggestions.map(s => (
-                                                <div key={s.id} onClick={() => handleSelectStudent(s)} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b">
-                                                    {s.name} <span className="text-xs text-slate-400">({s.class})</span>
+                                <div className="bg-slate-50 p-4 rounded border border-slate-200">
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Sasaran Siswa / Konseli</label>
+                                    
+                                    {isClassical ? (
+                                        <select className="w-full p-2 border rounded text-sm bg-white mb-2" onChange={(e) => handleClassSelect(e.target.value)}>
+                                            <option value="">-- Pilih Kelas --</option>
+                                            {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    ) : (
+                                        <div className="relative mb-2">
+                                            <Search className="absolute left-2 top-2.5 text-slate-400" size={16}/>
+                                            <input 
+                                                className="w-full pl-8 p-2 border rounded text-sm" 
+                                                placeholder="Ketik nama siswa..." 
+                                                value={searchStudent}
+                                                onChange={e=>setSearchStudent(e.target.value)}
+                                            />
+                                            {searchStudent && (
+                                                <div className="absolute z-10 w-full bg-white border shadow-lg max-h-40 overflow-y-auto mt-1 rounded">
+                                                    {studentSuggestions.map(s => (
+                                                        <div key={s.id} onClick={() => handleSelectStudent(s)} className="p-2 hover:bg-blue-50 cursor-pointer text-sm border-b">
+                                                            {s.name} <span className="text-xs text-slate-400">({s.class})</span>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     )}
+
+                                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                                        {selectedStudents.map(s => (
+                                            <span key={s.id} className="bg-white border px-2 py-1 rounded-full text-xs flex items-center gap-1 shadow-sm">
+                                                {s.name} <button type="button" onClick={() => handleRemoveStudent(s.id)}><X size={12} className="text-red-500"/></button>
+                                            </span>
+                                        ))}
+                                        {selectedStudents.length === 0 && <span className="text-xs text-slate-400 italic">Belum ada siswa dipilih.</span>}
+                                    </div>
                                 </div>
-                            )}
+                            </div>
 
-                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                                {selectedStudents.map(s => (
-                                    <span key={s.id} className="bg-white border px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                                        {s.name} <button type="button" onClick={() => handleRemoveStudent(s.id)}><X size={12} className="text-red-500"/></button>
-                                    </span>
-                                ))}
-                                {selectedStudents.length === 0 && <span className="text-xs text-slate-400 italic">Belum ada siswa dipilih.</span>}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Topik / Masalah</label>
+                                    <textarea className="w-full p-2 border rounded text-sm focus:ring-2 ring-blue-200" rows="3" placeholder="Deskripsi masalah atau topik bahasan..." value={form.description} onChange={e=>setForm({...form, description:e.target.value})} required></textarea>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Kategori Masalah</label>
+                                        <select className="w-full p-2 border rounded text-sm bg-white" value={form.category} onChange={e=>setForm({...form, category:e.target.value})}>
+                                            {MASALAH_KATEGORI.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Bidang Pengembangan</label>
+                                        <select className="w-full p-2 border rounded text-sm" value={form.skkpd} onChange={e=>setForm({...form, skkpd:e.target.value})}>
+                                            <option value="">-- Pilih Standar --</option>
+                                            {SKKPD_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Teknik Konseling</label>
+                                    <select className="w-full p-2 border rounded text-sm" value={form.technique} onChange={e=>setForm({...form, technique:e.target.value})}>
+                                        <option value="">-- Pilih Teknik --</option>
+                                        {TEKNIK_KONSELING.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+
+                                {/* EVALUASI SECTION - UPDATED TO TEXTAREA & STACKED */}
+                                <div className="space-y-4 bg-slate-50 p-4 rounded border border-slate-200">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Evaluasi Proses</label>
+                                        <textarea 
+                                            className="w-full p-2 border rounded text-sm focus:ring-2 ring-blue-200" 
+                                            rows="3" 
+                                            placeholder="Analisis proses layanan (keaktifan, antusiasme, hambatan)..." 
+                                            value={form.processEval} 
+                                            onChange={e=>setForm({...form, processEval:e.target.value})} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Evaluasi Hasil</label>
+                                        <textarea 
+                                            className="w-full p-2 border rounded text-sm focus:ring-2 ring-blue-200" 
+                                            rows="3" 
+                                            placeholder="Analisis hasil layanan (pemahaman, perasaan, rencana tindakan)..." 
+                                            value={form.resultEval} 
+                                            onChange={e=>setForm({...form, resultEval:e.target.value})} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Rencana Tindak Lanjut</label>
+                                        <select className="w-full p-2 border rounded text-sm font-bold text-green-700" value={form.followUp} onChange={e=>setForm({...form, followUp:e.target.value})}>
+                                            <option value="Selesai">Masalah Selesai</option>
+                                            <option value="Pantau">Perlu Pantauan Berkala</option>
+                                            <option value="Konseling Lanjutan">Jadwalkan Konseling Lanjutan</option>
+                                            <option value="Konferensi Kasus">Konferensi Kasus</option>
+                                            <option value="Alih Tangan Kasus">Alih Tangan Kasus (Referal)</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Topik / Masalah</label>
-                                <textarea className="w-full p-2 border rounded text-sm focus:ring-2 ring-blue-200" rows="2" placeholder="Deskripsi masalah atau topik bahasan..." value={form.description} onChange={e=>setForm({...form, description:e.target.value})} required></textarea>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Bidang Pengembangan (SKKPD)</label>
-                                <select className="w-full p-2 border rounded text-sm" value={form.skkpd} onChange={e=>setForm({...form, skkpd:e.target.value})}>
-                                    <option value="">-- Pilih Standar Kompetensi --</option>
-                                    {SKKPD_LIST.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Teknik Konseling</label>
-                                <select className="w-full p-2 border rounded text-sm" value={form.technique} onChange={e=>setForm({...form, technique:e.target.value})}>
-                                    <option value="">-- Pilih Teknik --</option>
-                                    {TEKNIK_KONSELING.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
-                            </div>
+                        <div className="pt-2 border-t border-slate-100 flex justify-end">
+                            <button className={`w-full md:w-auto px-8 py-3 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg text-white transition-transform active:scale-95 ${editingId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                {editingId ? <><RefreshCcw size={18}/> UPDATE JURNAL</> : <><Save size={18}/> SIMPAN JURNAL</>}
+                            </button>
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-3 rounded">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Evaluasi Proses</label>
-                                <input className="w-full p-2 border rounded text-sm" placeholder="Misal: Siswa antusias..." value={form.processEval} onChange={e=>setForm({...form, processEval:e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Evaluasi Hasil</label>
-                                <input className="w-full p-2 border rounded text-sm" placeholder="Misal: Memahami..." value={form.resultEval} onChange={e=>setForm({...form, resultEval:e.target.value})} />
-                            </div>
-                            <div className="col-span-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Rencana Tindak Lanjut</label>
-                                <select className="w-full p-2 border rounded text-sm font-bold text-green-700" value={form.followUp} onChange={e=>setForm({...form, followUp:e.target.value})}>
-                                    <option value="Selesai">Masalah Selesai</option>
-                                    <option value="Pantau">Perlu Pantauan Berkala</option>
-                                    <option value="Konseling Lanjutan">Jadwalkan Konseling Lanjutan</option>
-                                    <option value="Konferensi Kasus">Konferensi Kasus</option>
-                                    <option value="Alih Tangan Kasus">Alih Tangan Kasus (Referal)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <button className={`w-full text-white py-3 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg ${editingId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                            {editingId ? <><RefreshCcw size={18}/> UPDATE JURNAL</> : <><Save size={18}/> SIMPAN JURNAL</>}
-                        </button>
                     </form>
                 </div>
             </div>
 
-            <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
-                <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
+            {/* BOTTOM: HISTORY LIST - Full Width Grid */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                <div className="p-4 border-b bg-slate-50 flex justify-between items-center rounded-t-xl">
                     <h3 className="font-bold text-slate-700">Riwayat Aktivitas Terbaru</h3>
                     <div className="text-xs text-slate-500 italic">Urut berdasarkan tanggal terbaru</div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {journals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(j => (
-                        <div key={j.id} className={`bg-white border rounded-lg p-4 hover:shadow-md transition-shadow relative group ${editingId === j.id ? 'border-orange-500 ring-1 ring-orange-200 bg-orange-50' : 'border-slate-200'}`}>
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => handleEditClick(j)} className="text-slate-400 hover:text-blue-600 bg-white p-1 rounded-full shadow-sm border border-slate-200" title="Edit Jurnal Ini"><Edit size={16}/></button>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${j.serviceType?.includes('Kelompok') || j.serviceType?.includes('Klasikal') ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                    {j.serviceType}
-                                </span>
-                                <span className="text-xs text-slate-500 flex items-center gap-1">
-                                    <Calendar size={12}/> {formatIndoDate(j.date)}
-                                </span>
-                                {j.time && <span className="text-xs text-slate-500 flex items-center gap-1 border-l pl-2"><Clock size={12}/> {j.time}</span>}
-                            </div>
-
-                            <h4 className="font-bold text-slate-800 mb-1">{j.studentNames?.join(', ') || j.studentName}</h4>
-                            <p className="text-sm text-slate-600 mb-3 bg-slate-50 p-2 rounded border border-slate-100 italic">
-                                "{j.description}"
-                            </p>
-
-                            <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 border-t pt-2">
-                                <div>
-                                    <span className="font-bold block text-slate-400">Teknik / SKKPD:</span>
-                                    {j.technique || '-'} / {j.skkpd ? j.skkpd.substring(0, 20)+'...' : '-'}
+                <div className="p-6">
+                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {journals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(j => (
+                            <div key={j.id} className={`bg-white border rounded-lg p-4 hover:shadow-md transition-shadow relative group ${editingId === j.id ? 'border-orange-500 ring-1 ring-orange-200 bg-orange-50' : 'border-slate-200'}`}>
+                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => handleEditClick(j)} className="text-slate-400 hover:text-blue-600 bg-white p-1 rounded-full shadow-sm border border-slate-200" title="Edit Jurnal Ini"><Edit size={16}/></button>
                                 </div>
-                                <div className="text-right">
-                                    <span className="font-bold block text-slate-400">Tindak Lanjut:</span>
-                                    <span className={`font-bold ${j.followUp === 'Selesai' ? 'text-green-600' : 'text-orange-600'}`}>{j.followUp}</span>
+                                
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${j.serviceType?.includes('Kelompok') || j.serviceType?.includes('Klasikal') ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        {j.serviceType}
+                                    </span>
+                                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                                        <Calendar size={12}/> {formatIndoDate(j.date)}
+                                    </span>
+                                    {/* Show Semester Tag */}
+                                    {j.semester && (
+                                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1 rounded">
+                                            {j.semester} {j.academicYear}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <h4 className="font-bold text-slate-800 mb-1 line-clamp-1">{j.studentNames?.join(', ') || j.studentName}</h4>
+                                <p className="text-sm text-slate-600 mb-3 bg-slate-50 p-2 rounded border border-slate-100 italic line-clamp-2">
+                                    "{j.description}"
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 border-t pt-2 mt-auto">
+                                    <div>
+                                        <span className="font-bold block text-slate-400">Teknik:</span>
+                                        {j.technique || '-'}
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="font-bold block text-slate-400">Tindak Lanjut:</span>
+                                        <span className={`font-bold ${j.followUp === 'Selesai' ? 'text-green-600' : 'text-orange-600'}`}>{j.followUp}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                     {journals.length === 0 && (
                         <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl m-4">
                             <ClipboardList size={48} className="mx-auto mb-2 opacity-20"/>
@@ -1307,69 +1334,107 @@ const Journal = ({ students, journals, onAdd, onUpdate }) => {
     );
 };
 
-// 5. REPORTS MODULE (DIRECT PRINT + DYNAMIC ORIENTATION)
+// 5. REPORTS MODULE (WITH SEMESTER FILTER)
 const Reports = ({ journals, students, settings }) => {
-  const [reportType, setReportType] = useState('journal'); // 'journal', 'individual'
-  
+  const [reportType, setReportType] = useState('journal'); 
+  const [activeTab, setActiveTab] = useState('journal');
+
   return (
     <div className="space-y-6 pb-10">
-      {/* Tabs */}
+      <style>{`
+        @media print {
+          @page { size: auto; margin: 10mm; }
+          body * { visibility: hidden; }
+          .print-area, .print-area * { visibility: visible; }
+          .print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+          .print-hidden { display: none !important; }
+          .signature-section { page-break-inside: avoid; }
+          table, tr, td, th { page-break-inside: avoid; border-color: black !important; }
+        }
+      `}</style>
+
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-1 print:hidden px-6 pt-6">
-        {['journal', 'individual'].map((tab) => (
+        {[
+            { id: 'journal', label: 'Jurnal Bulanan' },
+            { id: 'individual', label: 'Rekam Jejak Siswa' },
+            { id: 'riskMap', label: 'Peta Kerawanan' },
+            { id: 'serviceProof', label: 'Bukti Layanan (LPL)' }
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setReportType(tab)}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
-              reportType === tab 
+              activeTab === tab.id 
                 ? 'bg-white text-blue-600 border-t-2 border-x border-blue-600 shadow-sm' 
                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
             }`}
           >
-            {tab === 'journal' ? 'Jurnal Bulanan' : 'Rekam Jejak Siswa'}
+            {tab.label}
           </button>
         ))}
       </div>
 
       <div className="p-6 min-h-[400px]">
-        {reportType === 'journal' && <JournalReportView journals={journals} students={students} settings={settings} />}
-        {reportType === 'individual' && <IndividualReportView journals={journals} students={students} settings={settings} />}
+        {activeTab === 'journal' && <JournalReportView journals={journals} students={students} settings={settings} />}
+        {activeTab === 'individual' && <IndividualReportView journals={journals} students={students} settings={settings} />}
+        {activeTab === 'riskMap' && <RiskMapReportView students={students} settings={settings} />}
+        {activeTab === 'serviceProof' && <ServiceProofView journals={journals} students={students} settings={settings} />}
       </div>
     </div>
   );
 };
 
-// 5a. JOURNAL REPORT VIEW (DYNAMIC)
 function JournalReportView({ journals, students, settings }) {
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [orientation, setOrientation] = useState('landscape'); // Default Landscape for table heavy report
+  const [orientation, setOrientation] = useState('landscape');
+  // Semester Filter
+  const [semesterFilter, setSemesterFilter] = useState(settings?.semester || 'Ganjil');
+  const [yearFilter, setYearFilter] = useState(settings?.academicYear || '2024/2025');
   
-  const monthlyJournals = journals.filter(j => j.date.startsWith(reportMonth)).sort((a,b) => a.date.localeCompare(b.date));
+  // Filter logic: Match Month AND (Semester OR Fallback to Date Logic if Tag Missing)
+  const monthlyJournals = journals.filter(j => {
+      const matchMonth = j.date.startsWith(reportMonth);
+      if (!matchMonth) return false;
+      
+      // If journal has semester tag, check it. If not, ignore (assume old data is valid for selected month)
+      if (j.semester && j.semester !== semesterFilter) return false;
+      if (j.academicYear && j.academicYear !== yearFilter) return false;
+
+      return true;
+  }).sort((a,b) => a.date.localeCompare(b.date));
 
   return (
     <div className="animate-in fade-in">
       <style>{`
         @media print {
           @page { size: ${orientation} auto; margin: 10mm; }
-          body { background: white; }
-          .print-hidden { display: none !important; }
-          .print-area { width: 100%; max-width: none; margin: 0; padding: 0; border: none; box-shadow: none; }
-          .signature-section { page-break-inside: avoid; }
-          table, tr, td, th { page-break-inside: avoid; border-color: black !important; }
         }
       `}</style>
 
-      {/* Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-end mb-6 gap-4 print:hidden bg-slate-50 p-4 rounded-lg border border-slate-200">
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
             <div className="w-full sm:w-auto">
                 <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Pilih Bulan</label>
                 <input type="month" className="border p-2 rounded w-full sm:w-48 bg-white text-sm" value={reportMonth} onChange={e => setReportMonth(e.target.value)} />
             </div>
+            {/* Semester Filters */}
             <div className="w-full sm:w-auto">
-                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Orientasi Kertas</label>
-                <select className="border p-2 rounded w-full sm:w-40 bg-white text-sm" value={orientation} onChange={e => setOrientation(e.target.value)}>
-                    <option value="portrait">Portrait (Tegak)</option>
-                    <option value="landscape">Landscape (Mendatar)</option>
+                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Tahun Ajaran</label>
+                <input className="border p-2 rounded w-full sm:w-32 bg-white text-sm" value={yearFilter} onChange={e => setYearFilter(e.target.value)} placeholder="2024/2025"/>
+            </div>
+            <div className="w-full sm:w-auto">
+                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Semester</label>
+                <select className="border p-2 rounded w-full sm:w-32 bg-white text-sm" value={semesterFilter} onChange={e => setSemesterFilter(e.target.value)}>
+                    <option value="Ganjil">Ganjil</option>
+                    <option value="Genap">Genap</option>
+                </select>
+            </div>
+            
+            <div className="w-full sm:w-auto">
+                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Orientasi</label>
+                <select className="border p-2 rounded w-full sm:w-32 bg-white text-sm" value={orientation} onChange={e => setOrientation(e.target.value)}>
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
                 </select>
             </div>
         </div>
@@ -1378,7 +1443,6 @@ function JournalReportView({ journals, students, settings }) {
         </button>
       </div>
 
-      {/* PAPER PREVIEW */}
       <div className={`print-area bg-white p-10 md:p-12 shadow-lg border border-slate-200 mx-auto transition-all duration-300 ${
           orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
       } print:w-full print:max-w-none print:min-h-0`}>
@@ -1387,7 +1451,7 @@ function JournalReportView({ journals, students, settings }) {
 
            <div className="text-center mb-6">
               <h3 className="text-xl font-bold underline uppercase">JURNAL KEGIATAN BIMBINGAN DAN KONSELING</h3>
-              <p className="mt-1">Bulan: <span className="font-bold">{new Date(reportMonth).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</span></p>
+              <p className="mt-1">Bulan: <span className="font-bold">{new Date(reportMonth).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</span> | Semester: {semesterFilter} {yearFilter}</p>
            </div>
 
            <table className="w-full border-collapse border border-black text-xs md:text-sm">
@@ -1421,7 +1485,7 @@ function JournalReportView({ journals, students, settings }) {
                    </tr>
                  )
                })}
-               {monthlyJournals.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic border border-black">Belum ada data jurnal pada bulan ini.</td></tr>}
+               {monthlyJournals.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic border border-black">Belum ada data jurnal pada bulan dan semester ini.</td></tr>}
              </tbody>
            </table>
            <SignatureSection settings={settings} dateLabel={`${settings.city || '...'}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`} />
@@ -1430,10 +1494,9 @@ function JournalReportView({ journals, students, settings }) {
   );
 }
 
-// 5b. INDIVIDUAL REPORT VIEW (DYNAMIC)
 function IndividualReportView({ journals, students, settings }) {
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [orientation, setOrientation] = useState('portrait'); // Default Portrait for individual
+  const [orientation, setOrientation] = useState('portrait'); 
 
   const studentHistory = useMemo(() => {
     if (!selectedStudentId) return [];
@@ -1450,15 +1513,9 @@ function IndividualReportView({ journals, students, settings }) {
       <style>{`
         @media print {
           @page { size: ${orientation} auto; margin: 10mm; }
-          body { background: white; }
-          .print-hidden { display: none !important; }
-          .print-area { width: 100%; max-width: none; margin: 0; padding: 0; border: none; box-shadow: none; }
-          .signature-section { page-break-inside: avoid; }
-          table, tr, td, th { page-break-inside: avoid; border-color: black !important; }
         }
       `}</style>
 
-      {/* Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-end mb-6 gap-4 print:hidden bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div className="flex flex-col sm:flex-row gap-4 w-full">
             <div className="w-full sm:w-auto flex-1">
@@ -1541,6 +1598,169 @@ function IndividualReportView({ journals, students, settings }) {
   );
 }
 
+// 5c. RISK MAP REPORT VIEW (NEW)
+function RiskMapReportView({ students, settings }) {
+  const [orientation, setOrientation] = useState('portrait');
+  
+  // Sort by Risk Level: HIGH > MEDIUM > LOW
+  const riskOrder = { 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+  const sortedStudents = [...students].sort((a,b) => {
+      const riskA = riskOrder[a.riskLevel] || 4;
+      const riskB = riskOrder[b.riskLevel] || 4;
+      if (riskA !== riskB) return riskA - riskB;
+      return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="animate-in fade-in">
+      <style>{`
+        @media print {
+          @page { size: ${orientation} auto; margin: 10mm; }
+        }
+      `}</style>
+      <div className="flex flex-col sm:flex-row justify-between items-end mb-6 gap-4 print:hidden bg-slate-50 p-4 rounded-lg border border-slate-200">
+         <div className="w-full sm:w-auto">
+            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Orientasi Kertas</label>
+            <select className="border p-2 rounded w-full sm:w-40 bg-white text-sm" value={orientation} onChange={e => setOrientation(e.target.value)}>
+                <option value="portrait">Portrait (Tegak)</option>
+                <option value="landscape">Landscape (Mendatar)</option>
+            </select>
+        </div>
+        <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-700 w-full sm:w-auto shadow-md font-bold transition-transform active:scale-95">
+          <Printer size={18}/> CETAK PETA KERAWANAN
+        </button>
+      </div>
+
+      <div className={`print-area bg-white p-10 md:p-12 shadow-lg border border-slate-200 mx-auto transition-all duration-300 ${
+          orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
+      } print:w-full print:max-w-none print:min-h-0`}>
+           
+           <KopSurat settings={settings} />
+
+           <div className="text-center mb-6">
+              <h3 className="text-xl font-bold underline uppercase">PETA KERAWANAN SISWA</h3>
+              <p className="mt-1">Tahun Pelajaran: {settings?.academicYear || new Date().getFullYear() + '/' + (new Date().getFullYear()+1)}</p>
+           </div>
+           
+           <table className="w-full border-collapse border border-black text-xs md:text-sm">
+             <thead>
+               <tr className="bg-gray-100 text-center">
+                 <th className="border border-black p-2 w-8">No</th>
+                 <th className="border border-black p-2">Nama Siswa</th>
+                 <th className="border border-black p-2 w-20">Kelas</th>
+                 <th className="border border-black p-2 w-32">Tingkat Kerawanan</th>
+                 <th className="border border-black p-2">Keterangan / Wali</th>
+               </tr>
+             </thead>
+             <tbody>
+               {sortedStudents.map((s, idx) => (
+                   <tr key={s.id}>
+                     <td className="border border-black p-2 text-center">{idx + 1}</td>
+                     <td className="border border-black p-2 font-bold">{s.name}</td>
+                     <td className="border border-black p-2 text-center">{s.class}</td>
+                     <td className="border border-black p-2 text-center font-bold">
+                        {s.riskLevel === 'HIGH' ? 'TINGGI' : s.riskLevel === 'MEDIUM' ? 'SEDANG' : 'RENDAH'}
+                     </td>
+                     <td className="border border-black p-2">
+                        {s.parent} {s.parentPhone ? `(${s.parentPhone})` : ''}
+                     </td>
+                   </tr>
+               ))}
+               {sortedStudents.length === 0 && <tr><td colSpan="5" className="text-center p-4 border border-black italic">Belum ada data siswa.</td></tr>}
+             </tbody>
+           </table>
+           <SignatureSection settings={settings} dateLabel={`${settings.city || '...'}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`} />
+      </div>
+    </div>
+  );
+}
+
+// 5d. SERVICE PROOF VIEW (NEW - LPL)
+function ServiceProofView({ journals, students, settings }) {
+  const [selectedJournalId, setSelectedJournalId] = useState('');
+  const [orientation, setOrientation] = useState('portrait'); 
+
+  // Filter journals for dropdown (Sort by newest)
+  const sortedJournals = [...journals].sort((a,b) => b.date.localeCompare(a.date));
+  const selectedJournal = journals.find(j => j.id === selectedJournalId);
+
+  return (
+    <div className="animate-in fade-in">
+      <style>{`
+        @media print {
+          @page { size: ${orientation} auto; margin: 10mm; }
+        }
+      `}</style>
+
+      <div className="flex flex-col sm:flex-row justify-between items-end mb-6 gap-4 print:hidden bg-slate-50 p-4 rounded-lg border border-slate-200">
+         <div className="flex-1 w-full">
+            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Pilih Kegiatan Layanan</label>
+            <select className="border p-2 rounded w-full bg-white text-sm" value={selectedJournalId} onChange={e => setSelectedJournalId(e.target.value)}>
+                <option value="">-- Pilih Kegiatan --</option>
+                {sortedJournals.map(j => (
+                  <option key={j.id} value={j.id}>
+                      {j.date} - {j.serviceType} - {j.studentName || 'Banyak Siswa'}
+                  </option>
+                ))}
+            </select>
+        </div>
+        <button disabled={!selectedJournal} onClick={() => window.print()} className="bg-blue-600 disabled:bg-slate-300 text-white px-6 py-2 rounded flex items-center justify-center gap-2 hover:bg-blue-700 w-full sm:w-auto shadow-md font-bold transition-transform active:scale-95">
+          <Printer size={18}/> CETAK BUKTI FISIK
+        </button>
+      </div>
+
+      {selectedJournal ? (
+        <div className={`print-area bg-white p-10 md:p-12 shadow-lg border border-slate-200 mx-auto transition-all duration-300 ${
+            orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
+        } print:w-full print:max-w-none print:min-h-0`}>
+           
+           <KopSurat settings={settings} />
+
+           <div className="text-center mb-8">
+              <h3 className="text-xl font-bold underline uppercase">LAPORAN PELAKSANAAN LAYANAN (LPL)</h3>
+              <p className="font-bold">BIMBINGAN DAN KONSELING</p>
+              <p className="mt-1 font-bold">Semester: {selectedJournal.semester || '-'} Tahun Ajaran: {selectedJournal.academicYear || '-'}</p>
+           </div>
+           
+           <div className="space-y-4 text-sm leading-relaxed">
+             <div className="grid grid-cols-[200px_10px_1fr] gap-1">
+                <div className="font-bold">1. Jenis Layanan</div><div>:</div><div>{selectedJournal.serviceType}</div>
+                <div className="font-bold">2. Bidang Bimbingan</div><div>:</div><div>{selectedJournal.skkpd || '-'}</div>
+                <div className="font-bold">3. Topik / Masalah</div><div>:</div><div>{selectedJournal.description}</div>
+                <div className="font-bold">4. Sasaran / Konseli</div><div>:</div><div>{selectedJournal.studentNames?.join(', ') || selectedJournal.studentName}</div>
+                <div className="font-bold">5. Hari / Tanggal</div><div>:</div><div>{formatIndoDate(selectedJournal.date)}</div>
+                <div className="font-bold">6. Waktu / Tempat</div><div>:</div><div>{selectedJournal.time || '-'} / {selectedJournal.place || '-'}</div>
+                <div className="font-bold">7. Teknik Konseling</div><div>:</div><div>{selectedJournal.technique || '-'}</div>
+             </div>
+
+             <div className="mt-6">
+                <div className="font-bold mb-2">8. Hasil / Evaluasi:</div>
+                <div className="border border-black p-4 min-h-[100px] text-justify">
+                    <p className="mb-2"><span className="font-bold">Proses:</span> {selectedJournal.processEval || '-'}</p>
+                    <p><span className="font-bold">Hasil:</span> {selectedJournal.resultEval || selectedJournal.result || '-'}</p>
+                </div>
+             </div>
+
+             <div className="mt-4">
+                <div className="font-bold mb-2">9. Tindak Lanjut:</div>
+                <div className="border border-black p-4">
+                    {selectedJournal.followUp}
+                </div>
+             </div>
+           </div>
+
+           <SignatureSection settings={settings} dateLabel={`${settings.city || '...'}, ${formatIndoDate(selectedJournal.date)}`} />
+        </div>
+      ) : (
+        <div className="text-center p-12 bg-slate-50 border border-dashed border-slate-300 rounded-lg text-slate-400 print:hidden">
+           <FileCheck size={48} className="mx-auto mb-2 opacity-50"/>
+           <p>Pilih salah satu kegiatan layanan untuk mencetak bukti fisik.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Helper: Kop Surat
 const KopSurat = ({ settings }) => (
     <div className="flex items-center justify-between border-b-4 border-double border-black pb-4 mb-6">
@@ -1579,7 +1799,7 @@ const SignatureSection = ({ settings, dateLabel }) => (
    </div>
 );
 
-// 5. SCHOOL SETTINGS (PER USER)
+// 5. SCHOOL SETTINGS (PER USER - WITH ACADEMIC YEAR)
 const SchoolSettings = ({ settings, onSave }) => {
     const [form, setForm] = useState({ ...settings });
     
@@ -1603,6 +1823,21 @@ const SchoolSettings = ({ settings, onSave }) => {
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Settings className="text-blue-600"/> Pengaturan Kop & Identitas</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    {/* NEW: ACADEMIC YEAR & SEMESTER */}
+                    <div className="col-span-1 md:col-span-2 bg-yellow-50 p-4 rounded border border-yellow-200 flex flex-col md:flex-row gap-4 mb-4">
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-yellow-800 uppercase mb-1">Tahun Ajaran Aktif</label>
+                            <input className="w-full p-2 border border-yellow-300 rounded" name="academicYear" value={form.academicYear || ''} onChange={handleChange} placeholder="Contoh: 2024/2025" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-yellow-800 uppercase mb-1">Semester Aktif</label>
+                            <select className="w-full p-2 border border-yellow-300 rounded bg-white" name="semester" value={form.semester || 'Ganjil'} onChange={handleChange}>
+                                <option value="Ganjil">Semester Ganjil</option>
+                                <option value="Genap">Semester Genap</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="space-y-4">
                         <h3 className="font-bold text-sm uppercase text-slate-400 border-b pb-2">Identitas Instansi</h3>
                         <input className="w-full p-2 border rounded" name="government" value={form.government || ''} onChange={handleChange} placeholder="Pemerintah Provinsi..." />
@@ -1660,7 +1895,8 @@ const AppLayout = ({ children, activeTab, setActiveTab, userRole, userName, onLo
     const menuItems = userRole === 'admin' 
         ? [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
-            { id: 'users', label: 'Manajemen User', icon: Users }
+            { id: 'users', label: 'Manajemen User', icon: Users },
+            { id: 'account', label: 'Profil Admin', icon: UserCog } // Added Admin Profile
           ]
         : [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -1947,6 +2183,9 @@ export default function App() {
                 <>
                     {activeTab === 'dashboard' && <AdminDashboard users={allUsers} studentsCount={students.length} journalsCount={journals.length} />}
                     {activeTab === 'users' && <AdminUserManagement users={allUsers} />}
+                    {activeTab === 'account' && (
+                        <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />
+                    )}
                 </>
             ) : (
                 <>
@@ -1969,7 +2208,8 @@ export default function App() {
                             students={students} 
                             journals={journals} 
                             onAdd={addJournal}
-                            onUpdate={updateJournal} 
+                            onUpdate={updateJournal}
+                            settings={mySettings} 
                         />
                     )}
                     {activeTab === 'reports' && (
@@ -1983,7 +2223,7 @@ export default function App() {
                         <SchoolSettings settings={mySettings} onSave={saveSettings} />
                     )}
                     {activeTab === 'account' && (
-                        <GuruAccount user={appUser} onUpdatePassword={handleUpdatePassword} />
+                        <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />
                     )}
                 </>
             )}
