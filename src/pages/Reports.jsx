@@ -2,15 +2,26 @@ import React, { useState, useMemo } from 'react';
 import { 
     Printer, Users, FileCheck, BookOpen, Map, 
     ChevronRight, ChevronDown, Calendar, FileText, 
-    LayoutTemplate, Filter, Search 
+    LayoutTemplate, Filter 
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
+
+// --- HELPER: PENGATUR UKURAN KERTAS DINAMIS ---
+const PrintPageSetup = ({ orientation = 'portrait' }) => (
+    <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+            @page { 
+                size: ${orientation} auto; 
+                margin: 10mm; 
+            }
+        }
+    `}} />
+);
 
 // --- MAIN COMPONENT ---
 const Reports = ({ journals, students, settings }) => {
   const [activeTab, setActiveTab] = useState('journal');
 
-  // Definisi Menu Laporan
   const REPORT_TYPES = [
     { id: 'journal', label: 'Jurnal Bulanan', icon: BookOpen, desc: 'Laporan aktivitas harian per bulan' },
     { id: 'classReport', label: 'Laporan Klasikal', icon: Users, desc: 'Rekap khusus bimbingan kelas' },
@@ -19,7 +30,6 @@ const Reports = ({ journals, students, settings }) => {
     { id: 'serviceProof', label: 'Bukti Layanan (LPL)', icon: FileCheck, desc: 'Dokumen fisik per kegiatan' },
   ];
 
-  // Helper untuk render konten
   const renderContent = (typeId) => {
       switch(typeId) {
           case 'journal': return <JournalReportView journals={journals} settings={settings} />;
@@ -32,35 +42,79 @@ const Reports = ({ journals, students, settings }) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
-      {/* GLOBAL PRINT STYLES */}
+    <div className="flex flex-col h-full bg-slate-50 app-container">
+      {/* GLOBAL PRINT STYLES - MULTI PAGE FIX */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
-          .print-hidden { display: none !important; }
+          /* 1. RESET STRUKTUR HALAMAN */
+          /* KUNCI: Ubah overflow menjadi visible agar konten bisa tumpah ke halaman 2 */
+          html, body, #root, .app-container, main {
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            position: static !important;
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: white !important;
+          }
+
+          /* 2. HILANGKAN ELEMEN UI (Display None agar ruangnya hilang) */
+          header, aside, .mobile-accordion-view, .print-hidden, .report-filter-card {
+            display: none !important;
+          }
+
+          /* 3. TAMPILKAN AREA CETAK */
+          #desktop-print-source {
+            display: block !important;
+            visibility: visible !important;
+            width: 100% !important;
+            position: static !important; /* KUNCI: Static agar pagination bekerja */
+            background-color: white !important;
+            color: black !important;
+          }
+
+          /* 4. PASTIKAN SEMUA ANAK ELEMEN TERLIHAT */
+          #desktop-print-source * {
+            visibility: visible !important;
+            color: black !important;
+          }
+
+          /* 5. ATURAN PEMENGGALAN HALAMAN (PAGINATION) */
+          .print-area {
+            width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          /* Jangan potong tabel di tengah baris */
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          /* Jangan potong tanda tangan */
           .signature-section { page-break-inside: avoid; }
-          table, tr, td, th { page-break-inside: avoid; border-color: black !important; }
-          .bg-slate-50 { background-color: white !important; } 
+          
+          /* Tabel Styling saat print */
+          table { width: 100% !important; border-collapse: collapse !important; }
+          td, th { border: 1px solid black !important; padding: 4px 8px !important; }
         }
       `}</style>
 
       {/* HEADER */}
-      <div className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm flex-shrink-0 print:hidden">
+      <header className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm flex-shrink-0 print-hidden">
         <div>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <Printer className="text-blue-600" /> Pusat Laporan & Cetak
             </h1>
             <p className="text-xs text-slate-500 mt-1 hidden md:block">Pilih jenis dokumen, atur filter, dan cetak laporan otomatis.</p>
         </div>
-      </div>
+      </header>
 
       {/* MAIN LAYOUT */}
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden max-w-7xl mx-auto w-full gap-6 items-start print:p-0 print:block">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden max-w-7xl mx-auto w-full gap-6 items-start">
         
-        {/* SIDEBAR NAVIGATION (Desktop Only) */}
-        <aside className="hidden md:block w-72 flex-shrink-0 print:hidden p-6 pr-0 h-full overflow-y-auto">
+        {/* SIDEBAR NAVIGATION */}
+        <aside className="hidden md:block w-72 flex-shrink-0 print-hidden p-6 pr-0 h-full overflow-y-auto">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-0">
                 <div className="p-4 border-b bg-slate-50">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Jenis Dokumen</span>
@@ -90,11 +144,11 @@ const Reports = ({ journals, students, settings }) => {
             </div>
         </aside>
 
-        {/* MAIN CONTENT AREA (Mobile & Desktop) */}
-        <main className="flex-1 w-full h-full overflow-y-auto p-4 md:p-6 print:block print:overflow-visible scroll-smooth">
+        {/* MAIN CONTENT AREA */}
+        <main className="flex-1 w-full h-full overflow-y-auto p-4 md:p-6 scroll-smooth">
             
             {/* TAMPILAN MOBILE (ACCORDION) */}
-            <div className="md:hidden space-y-3 mb-8 print:hidden">
+            <div className="md:hidden space-y-3 mb-8 mobile-accordion-view">
                 {REPORT_TYPES.map(tab => (
                     <div key={tab.id} className={`bg-white rounded-xl border transition-all duration-300 overflow-hidden ${activeTab === tab.id ? 'border-blue-300 shadow-md ring-1 ring-blue-100' : 'border-slate-200'}`}>
                         <button 
@@ -113,7 +167,7 @@ const Reports = ({ journals, students, settings }) => {
                             {activeTab === tab.id ? <ChevronDown size={20}/> : <ChevronRight size={20} className="text-slate-400"/>}
                         </button>
                         
-                        {/* KONTEN MOBILE (Untuk Interaksi Layar) */}
+                        {/* KONTEN MOBILE */}
                         {activeTab === tab.id && (
                             <div className="p-2 border-t border-blue-100 bg-slate-100/50">
                                 {renderContent(tab.id)}
@@ -123,9 +177,8 @@ const Reports = ({ journals, students, settings }) => {
                 ))}
             </div>
 
-            {/* TAMPILAN DESKTOP & PRINT SOURCE (PERBAIKAN UTAMA DISINI) */}
-            {/* Class 'print:block' ditambahkan agar konten ini selalu dirender saat mode cetak, meskipun di layar HP (hidden) */}
-            <div className="hidden md:block pb-20 print:block">
+            {/* TAMPILAN DESKTOP & SUMBER CETAK */}
+            <div id="desktop-print-source" className="hidden md:block pb-20">
                 {renderContent(activeTab)}
             </div>
 
@@ -136,10 +189,10 @@ const Reports = ({ journals, students, settings }) => {
   );
 };
 
-// --- REUSABLE UI COMPONENTS FOR REPORTS ---
+// --- REUSABLE UI COMPONENTS ---
 
 const ReportFilterCard = ({ children, onPrint, title }) => (
-    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 print:hidden">
+    <div className="report-filter-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 print-hidden">
         <div className="flex flex-col gap-4">
             <div className="w-full">
                 <div className="flex items-center gap-2 mb-4 border-b pb-2">
@@ -203,7 +256,7 @@ function JournalReportView({ journals, settings }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4">
-      <style>{`@media print { @page { size: ${orientation} auto; margin: 10mm; } }`}</style>
+      <PrintPageSetup orientation={orientation} />
 
       <ReportFilterCard title="Jurnal" onPrint={() => window.print()}>
           <FilterInput type="month" label="Bulan Laporan" value={reportMonth} onChange={e => setReportMonth(e.target.value)} />
@@ -218,7 +271,7 @@ function JournalReportView({ journals, settings }) {
 
       <div className={`print-area bg-white p-6 md:p-12 shadow-md border border-slate-200 mx-auto transition-all duration-300 ${
           orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
-      } print:w-full print:max-w-none print:min-h-0 print:border-none print:shadow-none overflow-x-auto`}>
+      }`}>
            <KopSurat settings={settings} />
            <div className="text-center mb-6">
               <h3 className="text-xl font-bold underline uppercase">JURNAL KEGIATAN BIMBINGAN DAN KONSELING</h3>
@@ -280,7 +333,7 @@ function ClassReportView({ journals, settings }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4">
-      <style>{`@media print { @page { size: ${orientation} auto; margin: 10mm; } }`}</style>
+      <PrintPageSetup orientation={orientation} />
 
       <ReportFilterCard title="Layanan Klasikal" onPrint={() => window.print()}>
           <FilterInput type="month" label="Bulan Laporan" value={reportMonth} onChange={e => setReportMonth(e.target.value)} />
@@ -295,7 +348,7 @@ function ClassReportView({ journals, settings }) {
 
       <div className={`print-area bg-white p-6 md:p-12 shadow-md border border-slate-200 mx-auto transition-all duration-300 ${
           orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
-      } print:w-full print:max-w-none print:min-h-0 print:border-none print:shadow-none overflow-x-auto`}>
+      }`}>
            <KopSurat settings={settings} />
            <div className="text-center mb-6">
               <h3 className="text-xl font-bold underline uppercase">LAPORAN LAYANAN BIMBINGAN KLASIKAL</h3>
@@ -348,10 +401,8 @@ function IndividualReportView({ journals, students, settings }) {
   const [searchName, setSearchName] = useState('');
   const [filterClass, setFilterClass] = useState('');
 
-  // 1. Ambil daftar kelas unik
   const uniqueClasses = useMemo(() => [...new Set(students.map(s => s.class))].sort(), [students]);
 
-  // 2. Filter Daftar Siswa di Dropdown berdasarkan Nama & Kelas
   const filteredStudentOptions = useMemo(() => {
     return students
         .filter(s => {
@@ -363,7 +414,6 @@ function IndividualReportView({ journals, students, settings }) {
         .map(s => ({ value: s.id, label: `${s.name} (${s.class})` }));
   }, [students, searchName, filterClass]);
 
-  // 3. Ambil data history jika siswa terpilih
   const studentHistory = useMemo(() => {
     if (!selectedStudentId) return [];
     return journals.filter(j => 
@@ -376,7 +426,7 @@ function IndividualReportView({ journals, students, settings }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4">
-      <style>{`@media print { @page { size: ${orientation} auto; margin: 10mm; } }`}</style>
+      <PrintPageSetup orientation={orientation} />
 
       <ReportFilterCard title="Rekam Jejak" onPrint={() => window.print()}>
           {/* SEARCH NAMA */}
@@ -417,7 +467,7 @@ function IndividualReportView({ journals, students, settings }) {
       {selectedStudent ? (
         <div className={`print-area bg-white p-6 md:p-12 shadow-md border border-slate-200 mx-auto transition-all duration-300 ${
             orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
-        } print:w-full print:max-w-none print:min-h-0 print:border-none print:shadow-none overflow-x-auto`}>
+        }`}>
            <KopSurat settings={settings} />
            <div className="text-center mb-6">
               <h3 className="text-xl font-bold underline uppercase">Laporan Perkembangan Peserta Didik</h3>
@@ -479,7 +529,7 @@ function RiskMapReportView({ students, settings }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4">
-      <style>{`@media print { @page { size: ${orientation} auto; margin: 10mm; } }`}</style>
+      <PrintPageSetup orientation={orientation} />
 
       <ReportFilterCard title="Peta Kerawanan" onPrint={() => window.print()}>
           <FilterInput type="select" label="Orientasi Kertas" value={orientation} onChange={e => setOrientation(e.target.value)} 
@@ -489,7 +539,7 @@ function RiskMapReportView({ students, settings }) {
 
       <div className={`print-area bg-white p-6 md:p-12 shadow-md border border-slate-200 mx-auto transition-all duration-300 ${
           orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
-      } print:w-full print:max-w-none print:min-h-0 print:border-none print:shadow-none overflow-x-auto`}>
+      }`}>
            <KopSurat settings={settings} />
            <div className="text-center mb-6">
               <h3 className="text-xl font-bold underline uppercase">PETA KERAWANAN SISWA</h3>
@@ -540,7 +590,7 @@ function ServiceProofView({ journals, settings }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4">
-      <style>{`@media print { @page { size: ${orientation} auto; margin: 10mm; } }`}</style>
+      <PrintPageSetup orientation={orientation} />
 
       <ReportFilterCard title="Bukti Fisik (LPL)" onPrint={() => window.print()}>
           <FilterInput type="select" label="Pilih Kegiatan Layanan" value={selectedJournalId} onChange={e => setSelectedJournalId(e.target.value)} 
@@ -554,7 +604,7 @@ function ServiceProofView({ journals, settings }) {
       {selectedJournal ? (
         <div className={`print-area bg-white p-6 md:p-12 shadow-md border border-slate-200 mx-auto transition-all duration-300 ${
             orientation === 'landscape' ? 'max-w-[297mm] min-h-[210mm]' : 'max-w-[210mm] min-h-[297mm]'
-        } print:w-full print:max-w-none print:min-h-0 print:border-none print:shadow-none`}>
+        }`}>
            <KopSurat settings={settings} />
            <div className="text-center mb-8"><h3 className="text-xl font-bold underline uppercase">LAPORAN PELAKSANAAN LAYANAN (LPL)</h3><p className="font-bold">BIMBINGAN DAN KONSELING</p><p className="mt-1 font-bold">Semester: {selectedJournal.semester || '-'} Tahun Ajaran: {selectedJournal.academicYear || '-'}</p></div>
            <div className="space-y-4 text-sm leading-relaxed">
