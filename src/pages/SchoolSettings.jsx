@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Settings, Save, Image as ImageIcon, MapPin, 
     CalendarClock, Building2, FileSignature, 
-    LayoutTemplate, UploadCloud, ChevronRight, ChevronDown 
+    LayoutTemplate, UploadCloud, ChevronRight, ChevronDown, Link as LinkIcon, Trash2 
 } from 'lucide-react';
 
 const SchoolSettings = ({ settings, onSave }) => {
@@ -10,6 +10,8 @@ const SchoolSettings = ({ settings, onSave }) => {
     const [form, setForm] = useState({ 
         academicYear: '2025/2026',
         semester: 'Ganjil',
+        logo: '',
+        logo2: '',
         ...settings 
     });
     
@@ -22,12 +24,26 @@ const SchoolSettings = ({ settings, onSave }) => {
 
     const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
     
+    // Handler Upload File dengan Validasi Ukuran (Maks 1 MB)
     const handleFile = (e, key) => {
         const file = e.target.files[0];
         if(file) {
+            // Cek ukuran file (1 MB = 1048576 bytes)
+            if (file.size > 1048576) {
+                alert("Ukuran file terlalu besar! Harap gunakan gambar dengan ukuran di bawah 1 MB.");
+                return; // Batalkan proses jika terlalu besar
+            }
+
             const reader = new FileReader();
-            reader.onload = () => setForm({...form, [key]: reader.result});
+            reader.onload = () => setForm(prev => ({...prev, [key]: reader.result}));
             reader.readAsDataURL(file);
+        }
+    };
+
+    // Handler Hapus Logo
+    const handleRemoveLogo = (key) => {
+        if(confirm('Hapus logo ini?')) {
+            setForm(prev => ({...prev, [key]: ''}));
         }
     };
 
@@ -73,10 +89,6 @@ const SchoolSettings = ({ settings, onSave }) => {
                                     <p className="text-[11px] text-slate-400 mt-1">Pilih semester yang sedang berjalan saat ini.</p>
                                 </div>
                             </div>
-                            <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-100 flex gap-3 text-sm text-blue-800">
-                                <CalendarClock className="flex-shrink-0" size={20}/>
-                                <p>Pastikan Anda memperbarui pengaturan ini setiap pergantian semester agar data jurnal tersimpan dengan label periode yang benar.</p>
-                            </div>
                         </div>
                     </div>
                 );
@@ -91,7 +103,6 @@ const SchoolSettings = ({ settings, onSave }) => {
                             </div>
                             
                             <div className="space-y-6">
-                                {/* Baris 1 & 2: Instansi & Dinas */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                     <InputGroup 
                                         label="1. Instansi Induk / Pemerintah (Baris Atas)" 
@@ -99,7 +110,6 @@ const SchoolSettings = ({ settings, onSave }) => {
                                         value={form.government} 
                                         onChange={handleChange}
                                         placeholder="PEMERINTAH PROVINSI SULAWESI UTARA"
-                                        help="Biasanya Pemerintah Provinsi atau Kabupaten/Kota"
                                     />
                                     <InputGroup 
                                         label="2. Nama Dinas / Yayasan (Baris Kedua)" 
@@ -107,11 +117,9 @@ const SchoolSettings = ({ settings, onSave }) => {
                                         value={form.department} 
                                         onChange={handleChange}
                                         placeholder="DINAS PENDIDIKAN DAERAH"
-                                        help="Nama Dinas Pendidikan atau Yayasan Naungan"
                                     />
                                 </div>
 
-                                {/* Baris 3: Nama Sekolah */}
                                 <InputGroup 
                                     label="3. Nama Sekolah (Utama)" 
                                     name="name" 
@@ -120,10 +128,8 @@ const SchoolSettings = ({ settings, onSave }) => {
                                     placeholder="SMA NEGERI 1 MANADO"
                                     bold
                                     customClass="text-lg"
-                                    help="Nama sekolah akan dicetak tebal dan besar pada Kop Surat"
                                 />
 
-                                {/* Baris 4: Alamat */}
                                 <InputGroup 
                                     label="4. Alamat Lengkap & Kontak" 
                                     name="address" 
@@ -131,10 +137,8 @@ const SchoolSettings = ({ settings, onSave }) => {
                                     onChange={handleChange}
                                     type="textarea"
                                     placeholder="Jl. Pramuka No. 1, Sario, Manado. Telp (0431) 86xxxx"
-                                    help="Termasuk Jalan, Desa/Kelurahan, Kecamatan, Kode Pos, No Telp, Email/Website."
                                 />
                                 
-                                {/* Kota Titimangsa */}
                                 <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100">
                                     <InputGroup 
                                         label="Kota / Tempat Titimangsa Surat" 
@@ -143,7 +147,6 @@ const SchoolSettings = ({ settings, onSave }) => {
                                         onChange={handleChange}
                                         placeholder="Contoh: Manado"
                                         icon={<MapPin size={16}/>}
-                                        help="Digunakan untuk tanggal surat di atas tanda tangan (Misal: Manado, 20 Januari 2025)"
                                         customClass="bg-white border-indigo-200 text-indigo-900 font-bold"
                                     />
                                 </div>
@@ -158,40 +161,54 @@ const SchoolSettings = ({ settings, onSave }) => {
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <div className="border-b pb-4 mb-4">
                                 <h2 className="text-lg font-bold text-slate-800">Logo Kop Surat</h2>
-                                <p className="text-sm text-slate-500">Unggah logo instansi (Kiri) dan logo sekolah (Kanan).</p>
+                                <p className="text-sm text-slate-500">Anda dapat menggunakan file dari komputer atau tautan gambar (URL). Kosongkan jika hanya ingin menggunakan 1 logo.</p>
                             </div>
+                            
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <LogoUploader 
+                                {/* LOGO KIRI */}
+                                <FlexibleLogoUploader 
                                     label="Logo Kiri (Pemda/Yayasan)" 
-                                    image={form.logo} 
-                                    onChange={(e) => handleFile(e, 'logo')} 
+                                    imageValue={form.logo} 
+                                    onFileChange={(e) => handleFile(e, 'logo')}
+                                    onUrlChange={(val) => setForm(prev => ({...prev, logo: val}))}
+                                    onRemove={() => handleRemoveLogo('logo')}
                                 />
-                                <LogoUploader 
+                                
+                                {/* LOGO KANAN */}
+                                <FlexibleLogoUploader 
                                     label="Logo Kanan (Sekolah/Tutwuri)" 
-                                    image={form.logo2} 
-                                    onChange={(e) => handleFile(e, 'logo2')} 
+                                    imageValue={form.logo2} 
+                                    onFileChange={(e) => handleFile(e, 'logo2')}
+                                    onUrlChange={(val) => setForm(prev => ({...prev, logo2: val}))}
+                                    onRemove={() => handleRemoveLogo('logo2')}
                                 />
                             </div>
+
                             <div className="mt-8 pt-6 border-t">
                                 <h3 className="font-bold text-sm text-slate-500 mb-3 uppercase tracking-wider">Simulasi Layout Kop</h3>
                                 {/* PREVIEW KOP SURAT */}
-                                <div className="border p-4 md:p-6 bg-white opacity-90 select-none shadow-sm">
+                                <div className="border p-4 md:p-6 bg-white select-none shadow-sm relative">
+                                    <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded">PREVIEW</div>
                                     <div className="flex items-center justify-between gap-4 border-b-4 border-double border-black pb-2">
+                                        
+                                        {/* Preview Logo Kiri */}
                                         <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
-                                            {form.logo ? <img src={form.logo} className="h-full w-full object-contain" alt="Logo"/> : <div className="w-12 h-12 bg-slate-200 rounded-full"></div>}
+                                            {form.logo ? <img src={form.logo} className="h-full w-full object-contain" alt="Logo Kiri"/> : null}
                                         </div>
+
                                         <div className="text-center flex-1">
                                             <h4 className="font-bold text-slate-600 text-xs md:text-sm uppercase tracking-wide">{form.government || 'PEMERINTAH PROVINSI ...'}</h4>
                                             <h3 className="font-bold text-slate-700 text-sm md:text-base uppercase tracking-wide">{form.department || 'DINAS PENDIDIKAN ...'}</h3>
                                             <h1 className="font-bold text-black text-lg md:text-xl uppercase my-1">{form.name || 'NAMA SEKOLAH'}</h1>
                                             <p className="text-[10px] md:text-xs text-slate-500">{form.address || 'Alamat Sekolah...'}</p>
                                         </div>
+
+                                        {/* Preview Logo Kanan */}
                                         <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
-                                            {form.logo2 ? <img src={form.logo2} className="h-full w-full object-contain" alt="Logo"/> : <div className="w-12 h-12 bg-slate-200 rounded-full"></div>}
+                                            {form.logo2 ? <img src={form.logo2} className="h-full w-full object-contain" alt="Logo Kanan"/> : null}
                                         </div>
                                     </div>
                                 </div>
-                                <p className="text-center text-xs text-slate-400 mt-2">Tampilan di atas hanya pratinjau layout. Hasil cetak PDF mungkin sedikit berbeda.</p>
                             </div>
                         </div>
                     </div>
@@ -274,11 +291,11 @@ const SchoolSettings = ({ settings, onSave }) => {
                 </button>
             </div>
 
-            {/* MAIN CONTENT WRAPPER (Scrollable) */}
+            {/* MAIN CONTENT WRAPPER */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 w-full no-scrollbar">
                 <div className="max-w-7xl mx-auto">
                     
-                    {/* --- TAMPILAN MOBILE (ACCORDION / DROPDOWN) --- */}
+                    {/* MOBILE ACCORDION */}
                     <div className="md:hidden space-y-3">
                         {TABS.map(tab => (
                             <div key={tab.id} className={`bg-white rounded-xl border transition-all duration-300 overflow-hidden ${activeTab === tab.id ? 'border-blue-300 shadow-md ring-1 ring-blue-100' : 'border-slate-200'}`}>
@@ -294,8 +311,6 @@ const SchoolSettings = ({ settings, onSave }) => {
                                     </div>
                                     {activeTab === tab.id ? <ChevronDown size={20}/> : <ChevronRight size={20} className="text-slate-400"/>}
                                 </button>
-                                
-                                {/* Form Content (Muncul di bawah jika aktif) */}
                                 {activeTab === tab.id && (
                                     <div className="p-4 border-t border-blue-100 bg-slate-50/50">
                                         {renderTabContent(tab.id)}
@@ -305,10 +320,10 @@ const SchoolSettings = ({ settings, onSave }) => {
                         ))}
                     </div>
 
-                    {/* --- TAMPILAN DESKTOP (SIDEBAR + MAIN) --- */}
+                    {/* DESKTOP LAYOUT */}
                     <div className="hidden md:flex gap-6 items-start h-full">
                         <aside className="w-64 flex-shrink-0">
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-6">
                                 <div className="p-4 border-b bg-slate-50">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Menu Pengaturan</span>
                                 </div>
@@ -348,7 +363,7 @@ const SchoolSettings = ({ settings, onSave }) => {
     );
 };
 
-// --- Helper Components untuk UI Rapi ---
+// --- HELPER COMPONENTS ---
 
 const InputGroup = ({ label, name, value, onChange, placeholder, type = "text", help, bold, fontMono, icon, customClass }) => (
     <div className="space-y-1.5 w-full">
@@ -378,28 +393,84 @@ const InputGroup = ({ label, name, value, onChange, placeholder, type = "text", 
     </div>
 );
 
-const LogoUploader = ({ label, image, onChange }) => (
-    <div className="w-full">
-        <label className="block text-sm font-bold text-slate-700 mb-2">{label}</label>
-        <div className="relative group">
-            <div className={`h-32 w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors bg-slate-50 ${image ? 'border-blue-300 bg-blue-50/30' : 'border-slate-300 hover:border-blue-400 hover:bg-white'}`}>
-                {image ? (
-                    <img src={image} className="h-full w-full object-contain p-2" alt="Preview"/>
-                ) : (
-                    <div className="text-center text-slate-400 group-hover:text-blue-500">
-                        <UploadCloud size={32} className="mx-auto mb-2"/>
-                        <span className="text-xs font-medium">Klik untuk upload logo</span>
-                    </div>
+// KOMPONEN UPLOAD LOGO BARU (DUA MODE: FILE & URL)
+const FlexibleLogoUploader = ({ label, imageValue, onFileChange, onUrlChange, onRemove }) => {
+    const [inputType, setInputType] = useState('file'); // 'file' atau 'url'
+
+    return (
+        <div className="w-full">
+            <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-bold text-slate-700">{label}</label>
+                
+                {/* Switch Mode Input */}
+                <div className="flex bg-slate-100 rounded-md p-0.5">
+                    <button 
+                        onClick={() => setInputType('file')}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${inputType === 'file' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}
+                    >
+                        File
+                    </button>
+                    <button 
+                        onClick={() => setInputType('url')}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${inputType === 'url' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}
+                    >
+                        URL
+                    </button>
+                </div>
+            </div>
+
+            <div className="relative group">
+                <div className={`h-36 w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors relative overflow-hidden ${imageValue ? 'border-blue-300 bg-blue-50/30' : 'border-slate-300 bg-slate-50'}`}>
+                    
+                    {/* Tombol Hapus (Muncul jika ada gambar) */}
+                    {imageValue && (
+                        <button 
+                            onClick={onRemove}
+                            className="absolute top-2 right-2 bg-red-100 text-red-600 p-1.5 rounded-full hover:bg-red-200 transition-colors z-10"
+                            title="Hapus Logo"
+                        >
+                            <Trash2 size={14}/>
+                        </button>
+                    )}
+
+                    {imageValue ? (
+                        <img src={imageValue} className="h-full w-full object-contain p-2" alt="Preview"/>
+                    ) : (
+                        <div className="text-center text-slate-400 p-4 w-full">
+                            {inputType === 'file' ? (
+                                <>
+                                    <UploadCloud size={28} className="mx-auto mb-2 text-slate-300"/>
+                                    <span className="text-xs font-medium block">Klik area ini untuk upload file</span>
+                                    <span className="text-[10px] opacity-60">(JPG, PNG, maks 1MB)</span>
+                                </>
+                            ) : (
+                                <div className="w-full px-4">
+                                    <LinkIcon size={24} className="mx-auto mb-2 text-slate-300"/>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Tempel tautan gambar (https://...)" 
+                                        className="w-full text-xs p-2 border rounded bg-white text-center focus:ring-1 focus:ring-blue-400 outline-none"
+                                        onChange={(e) => onUrlChange(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()} // Mencegah trigger file input
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Input File (Hanya aktif jika mode 'file' dan belum ada gambar) */}
+                {inputType === 'file' && !imageValue && (
+                    <input 
+                        type="file" 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                        onChange={onFileChange} 
+                        accept="image/*"
+                    />
                 )}
             </div>
-            <input 
-                type="file" 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                onChange={onChange} 
-                accept="image/*"
-            />
         </div>
-    </div>
-);
+    );
+};
 
 export default SchoolSettings;

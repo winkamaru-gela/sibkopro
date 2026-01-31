@@ -266,7 +266,7 @@ export default function App() {
                 </>
             ) : (
                 <>
-                    {activeTab === 'dashboard' && <GuruDashboard students={students} journals={journals} user={appUser} />}
+                    {activeTab === 'dashboard' && <GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} />}
                     
                     {activeTab === 'students' && <StudentManager students={students} 
                     
