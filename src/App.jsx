@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { 
-  query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, writeBatch, collection 
+  query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, writeBatch, collection, setDoc 
 } from 'firebase/firestore';
 
 // Import Config & Utils
@@ -19,6 +19,8 @@ import Journal from './pages/Journal';
 import Reports from './pages/Reports';
 import SchoolSettings from './pages/SchoolSettings';
 import AccountSettings from './pages/AccountSettings';
+import PointManager from './pages/PointManager';         
+import MasterDataSettings from './pages/MasterDataSettings'; 
 
 export default function App() {
     const [authUser, setAuthUser] = useState(null); 
@@ -33,6 +35,11 @@ export default function App() {
     const [students, setStudents] = useState([]);
     const [journals, setJournals] = useState([]);
     const [mySettings, setMySettings] = useState({});
+    
+    // State Poin, Master Data & Sanctions
+    const [pointLogs, setPointLogs] = useState([]);       
+    const [masterPoints, setMasterPoints] = useState([]); 
+    const [sanctionRules, setSanctionRules] = useState([]); // <--- STATE BARU
 
     // 1. Init Firebase Auth
     useEffect(() => {
@@ -59,6 +66,7 @@ export default function App() {
     useEffect(() => {
         if (!appUser || !authUser) return;
 
+        // A. Fetch Students
         const unsubStudents = onSnapshot(getCollectionRef(COLLECTION_PATHS.students), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
             if(appUser.role === 'guru') {
@@ -67,6 +75,7 @@ export default function App() {
             setStudents(data);
         });
 
+        // B. Fetch Journals
         const unsubJournals = onSnapshot(getCollectionRef(COLLECTION_PATHS.journals), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
             if(appUser.role === 'guru') {
@@ -75,6 +84,7 @@ export default function App() {
             setJournals(data);
         });
 
+        // C. Fetch Settings
         const unsubSettings = onSnapshot(getCollectionRef(COLLECTION_PATHS.settings), snap => {
             const allSettings = snap.docs.map(d => ({id: d.id, ...d.data()}));
             const mySet = allSettings.find(s => s.userId === appUser.id);
@@ -82,7 +92,34 @@ export default function App() {
             else setMySettings({});
         });
 
-        return () => { unsubStudents(); unsubJournals(); unsubSettings(); };
+        // D. Fetch Point Logs
+        const unsubPoints = onSnapshot(collection(db, 'point_logs'), snap => {
+            let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            setPointLogs(data);
+        });
+
+        // E. Fetch Master Data Points
+        const unsubMaster = onSnapshot(doc(db, 'settings', 'master_points'), (docSnap) => {
+            if (docSnap.exists()) {
+                setMasterPoints(docSnap.data().items || []);
+            } else {
+                setMasterPoints([]);
+            }
+        });
+
+        // F. Fetch Sanction Rules (BARU)
+        const unsubSanctions = onSnapshot(doc(db, 'settings', 'sanction_rules'), (docSnap) => {
+            if (docSnap.exists()) {
+                setSanctionRules(docSnap.data().items || []);
+            } else {
+                setSanctionRules([]);
+            }
+        });
+
+        return () => { 
+            unsubStudents(); unsubJournals(); unsubSettings(); 
+            unsubPoints(); unsubMaster(); unsubSanctions(); 
+        };
     }, [appUser, authUser]);
 
     // --- LOGIC FUNCTIONS ---
@@ -110,6 +147,9 @@ export default function App() {
             setAppUser(null);
             setStudents([]);
             setJournals([]);
+            setPointLogs([]);
+            setMasterPoints([]);
+            setSanctionRules([]);
         }
     };
 
@@ -119,7 +159,6 @@ export default function App() {
                 password: data.password,
                 fullName: data.fullName
             });
-            // Update state lokal agar nama di dashboard langsung berubah tanpa refresh
             setAppUser(prev => ({...prev, password: data.password, fullName: data.fullName}));
             alert("Profil berhasil diperbarui.");
         } catch (e) { alert("Gagal update profil."); }
@@ -184,6 +223,34 @@ export default function App() {
         alert("Pengaturan tersimpan.");
     };
 
+    const addPointLog = async (data) => {
+        await addDoc(collection(db, 'point_logs'), { 
+            ...data, 
+            teacherId: appUser.id, 
+            teacherName: appUser.fullName,
+            createdAt: new Date().toISOString() 
+        });
+    };
+
+    const deletePointLog = async (id) => {
+        await deleteDoc(doc(collection(db, 'point_logs'), id));
+    };
+
+    const saveMasterPoints = async (newItems) => {
+        try {
+            await setDoc(doc(db, 'settings', 'master_points'), { items: newItems });
+            alert("Master data poin berhasil disimpan!");
+        } catch (e) { console.error(e); alert("Gagal menyimpan."); }
+    };
+
+    // --- BARU: SIMPAN ATURAN SANKSI ---
+    const saveSanctionRules = async (newItems) => {
+        try {
+            await setDoc(doc(db, 'settings', 'sanction_rules'), { items: newItems });
+            alert("Aturan sanksi berhasil disimpan!");
+        } catch (e) { console.error(e); alert("Gagal menyimpan."); }
+    };
+
     // --- RENDER ---
     if (loading) return <div className="h-screen flex items-center justify-center text-slate-500 bg-slate-50">Menghubungkan ke Server SIBKO...</div>;
     
@@ -199,13 +266,49 @@ export default function App() {
                 </>
             ) : (
                 <>
-                    {/* PERBAIKAN: Menambahkan prop 'user={appUser}' agar nama guru muncul di Dashboard */}
                     {activeTab === 'dashboard' && <GuruDashboard students={students} journals={journals} user={appUser} />}
                     
-                    {activeTab === 'students' && <StudentManager students={students} journals={journals} onAdd={addStudent} onImport={importStudents} onMoveClass={handleMoveClass} onEdit={updateStudent} onDelete={deleteStudent} />}
+                    {activeTab === 'students' && <StudentManager students={students} 
+                    
+                    // --- TAMBAHKAN DUA BARIS INI ---
+        pointLogs={pointLogs}         // Kirim Data Poin
+        sanctionRules={sanctionRules} // Kirim Aturan Sanksi
+        // -------------------------------
+                    
+                    journals={journals} onAdd={addStudent} onImport={importStudents} onMoveClass={handleMoveClass} onEdit={updateStudent} onDelete={deleteStudent} />}
+                    
                     {activeTab === 'journal' && <Journal students={students} journals={journals} onAdd={addJournal} onUpdate={updateJournal} settings={mySettings} />}
+                    
+                    {/* Halaman Buku Saku - SEKARANG MENERIMA RULES SANKSI */}
+                    {activeTab === 'points' && (
+                        <PointManager 
+                            students={students} 
+                            pointLogs={pointLogs} 
+                            masterPoints={masterPoints} 
+                            sanctionRules={sanctionRules} // <--- Pass Props Baru
+                            onAddPoint={addPointLog} 
+                            onDeletePoint={deletePointLog} 
+                        />
+                    )}
+
+                    {/* Halaman Master Data Poin - SEKARANG MENERIMA PROPS BARU */}
+                    {activeTab === 'master_points' && (
+                        <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
+                            <MasterDataSettings 
+                                masterPoints={masterPoints} 
+                                onSavePoints={saveMasterPoints} // Ubah nama props agar jelas
+                                sanctionRules={sanctionRules}   // <--- Pass Props Baru
+                                onSaveSanctions={saveSanctionRules} // <--- Pass Props Baru
+                            />
+                        </div>
+                    )}
+                    
                     {activeTab === 'reports' && <Reports journals={journals} students={students} settings={mySettings} />}
-                    {activeTab === 'settings' && <SchoolSettings settings={mySettings} onSave={saveSettings} />}
+                    
+                    {activeTab === 'settings' && (
+                        <SchoolSettings settings={mySettings} onSave={saveSettings} />
+                    )}
+                    
                     {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}
                 </>
             )}

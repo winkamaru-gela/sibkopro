@@ -1,18 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
     Users, X, ArrowRightLeft, FileSpreadsheet, Upload, PlusCircle, 
     Save, Search, Phone, User, Eye, Edit, Trash2, BookOpen, 
-    Activity, CheckCircle, MoreVertical, Filter, GraduationCap, MapPin, Briefcase, Calendar, ChevronDown
+    Activity, CheckCircle, MoreVertical, Filter, GraduationCap, 
+    MapPin, Briefcase, Calendar, ChevronDown, Trophy, AlertTriangle, 
+    Gavel, AlertOctagon, UserCheck, ChevronUp
 } from 'lucide-react';
 import { formatIndoDate, parseImportDate } from '../utils/helpers';
 import { RISK_LEVELS } from '../utils/constants';
 
-const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport, onMoveClass }) => {
+const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, onEdit, onDelete, onImport, onMoveClass }) => {
     // State UI
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [viewDetail, setViewDetail] = useState(null); 
-    const [showMobileMenu, setShowMobileMenu] = useState(false); // Menu dropdown di HP
+    const [showMobileMenu, setShowMobileMenu] = useState(false); 
+    const [expandBio, setExpandBio] = useState(false); // State untuk toggle biodata
 
     // State Data Form
     const [formData, setFormData] = useState({ 
@@ -24,7 +27,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
     const [editingId, setEditingId] = useState(null);
     const fileInputRef = useRef(null);
 
-    // State Pindah Kelas (Bulk Action)
+    // State Pindah Kelas
     const [isMoveMode, setIsMoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [targetClass, setTargetClass] = useState('');
@@ -35,8 +38,17 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
         s.nisn?.includes(search)
     );
 
-    // --- LOGIC HELPERS ---
+    // --- LOGIC: HITUNG POIN & SANKSI ---
+    const getStudentPointStatus = (studentId) => {
+        const logs = (pointLogs || []).filter(p => p.studentId === studentId);
+        const violationTotal = logs.filter(p => p.type === 'violation').reduce((acc, curr) => acc + parseInt(curr.value || 0), 0);
+        const achievementTotal = logs.filter(p => p.type === 'achievement').reduce((acc, curr) => acc + parseInt(curr.value || 0), 0);
+        const netScore = violationTotal - achievementTotal;
+        const activeSanction = (sanctionRules || []).sort((a,b) => b.max - a.max).find(rule => netScore >= rule.min && netScore <= rule.max);
+        return { violationTotal, achievementTotal, netScore, activeSanction, logs };
+    };
 
+    // --- LOGIC HELPERS ---
     const getStudentHistory = (studentId) => {
         return journals.filter(j => 
             j.studentId === studentId || 
@@ -60,7 +72,6 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
         });
         setEditingId(null);
         setShowForm(false);
-        // Scroll ke atas saat batal
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -163,7 +174,6 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                         <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">{filteredStudents.length}</span>
                     </h2>
                     
-                    {/* Mobile Toggle Menu Button */}
                     {!isMoveMode && (
                         <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden bg-slate-100 text-slate-600 p-2 rounded-lg border border-slate-200">
                             <MoreVertical size={20}/>
@@ -171,10 +181,8 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                     )}
                 </div>
                 
-                {/* Search & Desktop Actions */}
                 <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-center">
                     {isMoveMode ? (
-                        // MODE PINDAH KELAS (BULK ACTION UI)
                         <div className="flex flex-wrap items-center gap-2 bg-orange-50 p-2 rounded-lg border border-orange-200 animate-in fade-in w-full md:w-auto">
                             <span className="text-xs font-bold text-orange-700 px-2 whitespace-nowrap">{selectedIds.length} Dipilih</span>
                             <input 
@@ -191,7 +199,6 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                             </button>
                         </div>
                     ) : (
-                        // MODE NORMAL
                         <>
                             <div className="relative w-full md:w-64">
                                 <Search className="text-slate-400 absolute left-3 top-2.5" size={18}/>
@@ -203,7 +210,6 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                                 />
                             </div>
                             
-                            {/* Desktop Buttons */}
                             <div className="hidden md:flex gap-2">
                                 <button onClick={() => setIsMoveMode(true)} className="bg-orange-100 text-orange-700 hover:bg-orange-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
                                     <ArrowRightLeft size={18}/>
@@ -224,7 +230,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                 </div>
             </div>
 
-            {/* MOBILE MENU DROPDOWN (Expandable Action Menu) */}
+            {/* MOBILE MENU DROPDOWN */}
             {showMobileMenu && !isMoveMode && (
                 <div className="md:hidden bg-white p-3 rounded-xl shadow-lg border border-slate-200 grid grid-cols-2 gap-3 animate-in slide-in-from-top-2">
                     <button onClick={() => {resetForm(); setShowForm(!showForm); setShowMobileMenu(false);}} className="col-span-2 bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
@@ -242,7 +248,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                 </div>
             )}
 
-            {/* FORM INPUT SISWA (Responsive Grid) */}
+            {/* FORM INPUT SISWA */}
             {showForm && (
                 <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-xl animate-in fade-in slide-in-from-top-4 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
@@ -255,7 +261,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                     </div>
                     
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Identitas Utama */}
+                        {/* Form Identitas */}
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-2 border-b border-slate-200 pb-2">
                                 <User size={14}/> Identitas Siswa
@@ -282,7 +288,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                             <InputGroup label="Alamat Lengkap" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Jalan, Desa, Kecamatan..."/>
                         </div>
 
-                        {/* Data Orang Tua */}
+                        {/* Form Ortu */}
                         <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100 space-y-4">
                             <h4 className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-2 mb-2 border-b border-purple-200 pb-2">
                                 <Users size={14}/> Orang Tua / Wali
@@ -315,20 +321,17 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                 </div>
             )}
 
-            {/* --- DISPLAY MODE SWITCHER (TABLE VS CARD) --- */}
-            
-            {/* VIEW 1: MOBILE CARD LIST (Hidden on Desktop) */}
+            {/* LIST SISWA (MOBILE) */}
             <div className="md:hidden space-y-3">
                 {filteredStudents.map(s => (
                     <div key={s.id} className={`bg-white p-4 rounded-xl shadow-sm border relative overflow-hidden transition-all active:scale-[0.99] ${selectedIds.includes(s.id) ? 'border-orange-400 bg-orange-50' : 'border-slate-200'}`}>
-                        {/* Checkbox for Bulk Action */}
                         {isMoveMode && (
                             <div className="absolute top-0 right-0 p-3 bg-white/80 rounded-bl-xl backdrop-blur-sm z-10">
                                 <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => handleSelectOne(s.id)} className="w-5 h-5 accent-orange-600"/>
                             </div>
                         )}
 
-                        <div className="flex gap-3 items-start mb-3" onClick={() => setViewDetail(s)}>
+                        <div className="flex gap-3 items-start mb-3" onClick={() => { setViewDetail(s); setExpandBio(false); }}>
                             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 flex-shrink-0">
                                 <User size={24}/>
                             </div>
@@ -351,8 +354,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                                 {RISK_LEVELS[s.riskLevel].label}
                             </span>
                             <div className="flex gap-2">
-                                {/* TOMBOL VIEW (MOBILE) DITAMBAHKAN DISINI */}
-                                <button onClick={() => setViewDetail(s)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 border border-slate-200">
+                                <button onClick={() => { setViewDetail(s); setExpandBio(false); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 border border-slate-200">
                                     <Eye size={16}/>
                                 </button>
                                 <button onClick={() => handleEditClick(s)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 border border-blue-100">
@@ -367,7 +369,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                 ))}
             </div>
 
-            {/* VIEW 2: DESKTOP TABLE (Hidden on Mobile) */}
+            {/* TABLE SISWA (DESKTOP) */}
             <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -413,7 +415,7 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                                     </td>
                                     <td className="p-4 text-center">
                                         <div className="flex justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => setViewDetail(s)} className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors border border-blue-100" title="Lihat Profil">
+                                            <button onClick={() => { setViewDetail(s); setExpandBio(false); }} className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors border border-blue-100" title="Lihat Profil">
                                                 <Eye size={16}/>
                                             </button>
                                             <button onClick={() => handleEditClick(s)} className="text-orange-600 bg-orange-50 hover:bg-orange-100 p-2 rounded-lg transition-colors border border-orange-100" title="Edit Data">
@@ -432,85 +434,186 @@ const StudentManager = ({ students, journals, onAdd, onEdit, onDelete, onImport,
                 </div>
             </div>
 
-            {/* DETAIL MODAL (Pop-up) */}
+            {/* --- BUKU PRIBADI SISWA (MODAL SINGLE PAGE VIEW) --- */}
             {viewDetail && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className="p-4 bg-slate-900 text-white flex justify-between items-center sticky top-0">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in">
+                    <div className="bg-white md:rounded-2xl shadow-2xl w-full max-w-4xl h-full md:max-h-[95vh] flex flex-col overflow-hidden">
+                        
+                        {/* Header Modal */}
+                        <div className="p-4 bg-slate-900 text-white flex justify-between items-center flex-shrink-0">
                             <h3 className="font-bold text-lg flex items-center gap-2"><BookOpen size={20}/> Buku Pribadi Siswa</h3>
                             <button onClick={() => setViewDetail(null)} className="hover:bg-slate-700 p-1.5 rounded-full transition-colors"><X size={20}/></button>
                         </div>
-                        
-                        <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
-                                <div className="flex flex-col md:flex-row gap-8">
-                                    <div className="w-full md:w-1/3 flex flex-col items-center">
-                                        <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center mb-4 border-4 border-white shadow-lg text-blue-300">
-                                            <User size={64}/>
-                                        </div>
-                                        <h2 className="text-2xl font-bold text-slate-800 text-center leading-tight">{viewDetail.name}</h2>
-                                        <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-bold mt-3 shadow-md">{viewDetail.class}</div>
-                                        
-                                        <div className="mt-6 w-full">
-                                            <div className={`p-4 rounded-xl text-center border-2 ${viewDetail.riskLevel === 'HIGH' ? 'bg-red-50 border-red-100 text-red-800' : viewDetail.riskLevel === 'MEDIUM' ? 'bg-yellow-50 border-yellow-100 text-yellow-800' : 'bg-green-50 border-green-100 text-green-800'}`}>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Status Resiko</p>
-                                                <p className="font-bold text-lg">{RISK_LEVELS[viewDetail.riskLevel].label}</p>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="w-full md:w-2/3 space-y-6">
-                                        <div>
-                                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2 mb-3">Identitas & Kontak</h4>
-                                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                                                <div><p className="text-slate-500 text-xs">NIS / NISN</p><p className="font-medium text-slate-800">{viewDetail.nisn || '-'}</p></div>
-                                                <div><p className="text-slate-500 text-xs">Jenis Kelamin</p><p className="font-medium text-slate-800">{viewDetail.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</p></div>
-                                                <div><p className="text-slate-500 text-xs">Tempat, Tgl Lahir</p><p className="font-medium text-slate-800">{viewDetail.pob || '-'}, {formatIndoDate(viewDetail.dob)}</p></div>
-                                                <div><p className="text-slate-500 text-xs">No HP Siswa</p><p className="font-medium text-slate-800">{viewDetail.phone || '-'}</p></div>
-                                                <div className="col-span-2"><p className="text-slate-500 text-xs">Alamat</p><p className="font-medium text-slate-800">{viewDetail.address || '-'}</p></div>
+                        {/* Konten Scrollable */}
+                        <div className="flex-1 overflow-y-auto bg-slate-100 pb-10">
+                            {(() => {
+                                const { violationTotal, achievementTotal, netScore, activeSanction, logs } = getStudentPointStatus(viewDetail.id);
+                                const history = getStudentHistory(viewDetail.id);
+
+                                return (
+                                    <>
+                                        {/* 1. STICKY HEADER SISWA */}
+                                        <div className="bg-white p-4 md:p-6 border-b border-slate-200 sticky top-0 z-20 shadow-sm flex items-center gap-4">
+                                            <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold text-xl flex-shrink-0 shadow-inner">
+                                                {viewDetail.name.charAt(0)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h2 className="text-xl font-bold text-slate-800 line-clamp-1">{viewDetail.name}</h2>
+                                                <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
+                                                    <span className="bg-slate-100 px-2 rounded font-mono font-bold text-slate-700 border border-slate-200">{viewDetail.class}</span>
+                                                    <span>{viewDetail.nisn}</span>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div>
-                                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2 mb-3">Orang Tua / Wali</h4>
-                                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                                                <div><p className="text-slate-500 text-xs">Nama</p><p className="font-medium text-slate-800">{viewDetail.parent || '-'}</p></div>
-                                                <div><p className="text-slate-500 text-xs">Pekerjaan</p><p className="font-medium text-slate-800">{viewDetail.jobParent || '-'}</p></div>
-                                                <div className="col-span-2"><p className="text-slate-500 text-xs">Kontak Ortu</p><p className="font-medium text-blue-600">{viewDetail.parentPhone || '-'}</p></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Activity size={18} className="text-blue-500"/> Riwayat Layanan BK</h3>
-                                <div className="space-y-3">
-                                    {getStudentHistory(viewDetail.id).map(h => (
-                                        <div key={h.id} className="bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg hover:bg-slate-100 transition-colors">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <span className="text-[10px] font-bold text-blue-700 uppercase bg-blue-100 px-2 py-0.5 rounded">{h.serviceType}</span>
-                                                <span className="text-[10px] text-slate-400">{formatIndoDate(h.date)}</span>
-                                            </div>
-                                            <p className="text-sm font-medium text-slate-800">{h.description}</p>
-                                            {h.result && (
-                                                <div className="mt-2 text-xs text-slate-600 bg-white p-2 rounded border border-slate-200">
-                                                    <span className="font-bold">Hasil:</span> {h.result}
+                                        {/* 2. ALERT & STATUS POIN (LANGSUNG TERLIHAT) */}
+                                        <div className="p-4 md:p-6 space-y-4">
+                                            
+                                            {/* Sanksi Alert: Paling Atas agar jadi perhatian */}
+                                            {activeSanction ? (
+                                                <div className="bg-red-600 text-white rounded-xl p-5 shadow-lg flex flex-col md:flex-row items-start md:items-center gap-4 animate-in slide-in-from-top-4 border-l-8 border-red-800">
+                                                    <div className="bg-red-800/50 p-3 rounded-full flex-shrink-0">
+                                                        <AlertOctagon size={32}/>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="text-xs font-bold text-red-200 uppercase tracking-widest mb-1">STATUS: PERLU TINDAK LANJUT</p>
+                                                        <h3 className="text-2xl font-bold leading-tight">{activeSanction.action}</h3>
+                                                        <p className="text-red-100 mt-1 opacity-90">Sanksi: {activeSanction.penalty}</p>
+                                                    </div>
+                                                    <div className="text-center bg-white/10 px-4 py-2 rounded-lg">
+                                                        <span className="block text-xs font-bold opacity-70">Total Poin</span>
+                                                        <span className="block text-2xl font-bold">{netScore}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="bg-green-600 text-white rounded-xl p-4 shadow-lg flex items-center gap-4 border-l-8 border-green-800">
+                                                    <div className="bg-green-800/50 p-2 rounded-full">
+                                                        <CheckCircle size={24}/>
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-bold text-lg">Status Disiplin: Aman</h3>
+                                                        <p className="text-xs text-green-100 opacity-80">Siswa belum mencapai batas poin sanksi.</p>
+                                                    </div>
                                                 </div>
                                             )}
+
+                                            {/* Statistik Card */}
+                                            <div className="grid grid-cols-3 gap-2 md:gap-4">
+                                                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+                                                    <p className="text-[10px] md:text-xs text-red-500 font-bold uppercase mb-1">Pelanggaran</p>
+                                                    <p className="text-xl md:text-2xl font-bold text-slate-800">{violationTotal}</p>
+                                                </div>
+                                                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+                                                    <p className="text-[10px] md:text-xs text-green-600 font-bold uppercase mb-1">Prestasi</p>
+                                                    <p className="text-xl md:text-2xl font-bold text-slate-800">{achievementTotal}</p>
+                                                </div>
+                                                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center relative overflow-hidden">
+                                                    <div className={`absolute top-0 left-0 w-1 h-full ${netScore > 0 ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                                                    <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase mb-1">Poin Bersih</p>
+                                                    <p className={`text-xl md:text-2xl font-bold ${netScore > 0 ? 'text-orange-600' : 'text-green-600'}`}>{netScore}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* 3. TIMELINE RIWAYAT POIN & LAYANAN (Digabung agar kronologis) */}
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                                {/* Kolom Kiri: Riwayat Poin */}
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                                        <h4 className="font-bold text-slate-700 flex items-center gap-2"><Gavel size={16}/> Catatan Poin</h4>
+                                                        <span className="text-xs bg-slate-200 px-2 py-0.5 rounded-full text-slate-600">{logs.length}</span>
+                                                    </div>
+                                                    <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
+                                                        {logs.length > 0 ? logs.map(log => (
+                                                            <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors flex gap-3">
+                                                                <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${log.type === 'violation' ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                                                                <div className="flex-1">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${log.type === 'violation' ? 'text-red-600' : 'text-green-600'}`}>
+                                                                            {log.type === 'violation' ? 'Pelanggaran' : 'Prestasi'}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-slate-400">{formatIndoDate(log.date)}</span>
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-slate-800 mt-0.5">{log.description}</p>
+                                                                    <p className="text-xs text-slate-500 mt-1 font-mono">Nilai: {log.value}</p>
+                                                                </div>
+                                                            </div>
+                                                        )) : (
+                                                            <div className="p-8 text-center text-slate-400 italic text-sm">Belum ada catatan poin.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Kolom Kanan: Riwayat Layanan */}
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                                        <h4 className="font-bold text-slate-700 flex items-center gap-2"><Activity size={16}/> Layanan BK</h4>
+                                                        <span className="text-xs bg-slate-200 px-2 py-0.5 rounded-full text-slate-600">{history.length}</span>
+                                                    </div>
+                                                    <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
+                                                        {history.length > 0 ? history.map(h => (
+                                                            <div key={h.id} className="p-4 hover:bg-slate-50 transition-colors">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">
+                                                                        {h.serviceType}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-slate-400">{formatIndoDate(h.date)}</span>
+                                                                </div>
+                                                                <p className="text-sm text-slate-700 line-clamp-2">{h.description}</p>
+                                                            </div>
+                                                        )) : (
+                                                            <div className="p-8 text-center text-slate-400 italic text-sm">Belum ada riwayat layanan.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* 4. BIODATA (COLLAPSIBLE / DI BAWAH) */}
+                                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
+                                                <button 
+                                                    onClick={() => setExpandBio(!expandBio)}
+                                                    className="w-full p-4 flex justify-between items-center bg-slate-50 hover:bg-slate-100 transition-colors rounded-t-xl"
+                                                >
+                                                    <span className="font-bold text-slate-700 flex items-center gap-2"><UserCheck size={16}/> Informasi Lengkap Siswa</span>
+                                                    {expandBio ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                                                </button>
+                                                
+                                                {expandBio && (
+                                                    <div className="p-5 border-t border-slate-200 animate-in slide-in-from-top-2 fade-in">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                                                            <div className="space-y-3">
+                                                                <h5 className="font-bold text-xs text-slate-400 uppercase border-b pb-1 mb-2">Data Diri</h5>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Tempat Lahir</span> <span className="font-medium">{viewDetail.pob || '-'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Tanggal Lahir</span> <span className="font-medium">{formatIndoDate(viewDetail.dob)}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Jenis Kelamin</span> <span className="font-medium">{viewDetail.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Alamat</span> <span className="font-medium text-right max-w-[200px]">{viewDetail.address || '-'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">No HP</span> <span className="font-medium">{viewDetail.phone || '-'}</span></div>
+                                                            </div>
+                                                            <div className="space-y-3">
+                                                                <h5 className="font-bold text-xs text-slate-400 uppercase border-b pb-1 mb-2">Data Wali</h5>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Nama Wali</span> <span className="font-medium">{viewDetail.parent || '-'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Pekerjaan</span> <span className="font-medium">{viewDetail.jobParent || '-'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Kontak Wali</span> <span className="font-medium text-blue-600">{viewDetail.parentPhone || '-'}</span></div>
+                                                                <div className="flex justify-between mt-4 bg-yellow-50 p-2 rounded">
+                                                                    <span className="text-slate-500 font-bold">Resiko Awal</span> 
+                                                                    <span className={`font-bold ${RISK_LEVELS[viewDetail.riskLevel].badge} px-2 rounded`}>{RISK_LEVELS[viewDetail.riskLevel].label}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                         </div>
-                                    ))}
-                                    {getStudentHistory(viewDetail.id).length === 0 && (
-                                        <div className="text-center py-8 text-slate-400 italic border border-dashed rounded-lg">
-                                            Belum ada riwayat layanan tercatat.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                         
-                        <div className="p-4 border-t bg-white flex justify-end">
-                            <button onClick={() => setViewDetail(null)} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors">Tutup</button>
+                        <div className="p-4 border-t bg-white flex justify-end flex-shrink-0">
+                            <button onClick={() => setViewDetail(null)} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors w-full md:w-auto">
+                                Tutup Buku
+                            </button>
                         </div>
                     </div>
                 </div>

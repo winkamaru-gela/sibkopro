@@ -1,6 +1,7 @@
 // src/components/Layout.jsx
 import React, { useState, useEffect } from 'react';
-import { Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, X, List } from 'lucide-react';
+// Tambahkan 'Database' atau gunakan 'List' untuk ikon Master Data
+import { Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, X, List, Trophy, Database } from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogout }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,9 +29,19 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
             { id: 'dashboard', label: 'Dashboard', icon: Home },
             { id: 'students', label: 'Data Siswa', icon: Users },
             { id: 'journal', label: 'Jurnal Harian', icon: BookOpen },
+            
+            // Menu Operasional Poin
+            { id: 'points', label: 'Catat Poin', icon: Trophy }, 
+            
+            // --- MENU MASTER DATA (DIPISAH) ---
+            { id: 'master_points', label: 'Master Data Poin', icon: Database }, 
+            
             { id: 'reports', label: 'Laporan & Cetak', icon: Printer },
-            { id: 'settings', label: 'Pengaturan Sekolah', icon: Settings },
-            { id: 'account', label: 'Edit Akun', icon: UserCog }
+            
+            // --- MENU PENGATURAN SEKOLAH (DIPISAH) ---
+            { id: 'settings', label: 'Pengaturan Sekolah', icon: Settings }, 
+            
+            { id: 'account', label: 'Akun Saya', icon: UserCog }
           ];
 
     const handleMenuClick = (id) => {

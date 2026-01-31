@@ -39,7 +39,7 @@ const SchoolSettings = ({ settings, onSave }) => {
         { id: 'ttd', label: 'Penandatangan', icon: FileSignature, desc: 'Kepala Sekolah & Guru BK' },
     ];
 
-    // FUNGSI RENDER KONTEN (Dipakai di Mobile & Desktop agar tidak duplikasi)
+    // FUNGSI RENDER KONTEN
     const renderTabContent = (tabId) => {
         switch (tabId) {
             case 'periode':
@@ -80,57 +80,78 @@ const SchoolSettings = ({ settings, onSave }) => {
                         </div>
                     </div>
                 );
+            
             case 'identitas':
                 return (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <div className="border-b pb-4 mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Identitas Sekolah</h2>
-                                <p className="text-sm text-slate-500">Informasi ini akan tampil pada Kop Surat Laporan.</p>
+                                <h2 className="text-lg font-bold text-slate-800">Identitas Sekolah (Kop Surat)</h2>
+                                <p className="text-sm text-slate-500">Isi data secara berurutan sesuai struktur Kop Surat resmi.</p>
                             </div>
-                            <div className="space-y-5">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            <div className="space-y-6">
+                                {/* Baris 1 & 2: Instansi & Dinas */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                     <InputGroup 
-                                        label="Pemerintah / Yayasan (Baris 1)" 
+                                        label="1. Instansi Induk / Pemerintah (Baris Atas)" 
                                         name="government" 
                                         value={form.government} 
                                         onChange={handleChange}
-                                        placeholder="PEMERINTAH PROVINSI ..."
+                                        placeholder="PEMERINTAH PROVINSI SULAWESI UTARA"
+                                        help="Biasanya Pemerintah Provinsi atau Kabupaten/Kota"
                                     />
                                     <InputGroup 
-                                        label="Nama Sekolah (Utama)" 
-                                        name="name" 
-                                        value={form.name} 
+                                        label="2. Nama Dinas / Yayasan (Baris Kedua)" 
+                                        name="department" 
+                                        value={form.department} 
                                         onChange={handleChange}
-                                        placeholder="SMA NEGERI ..."
-                                        bold
+                                        placeholder="DINAS PENDIDIKAN DAERAH"
+                                        help="Nama Dinas Pendidikan atau Yayasan Naungan"
                                     />
                                 </div>
+
+                                {/* Baris 3: Nama Sekolah */}
                                 <InputGroup 
-                                    label="Alamat Lengkap" 
+                                    label="3. Nama Sekolah (Utama)" 
+                                    name="name" 
+                                    value={form.name} 
+                                    onChange={handleChange}
+                                    placeholder="SMA NEGERI 1 MANADO"
+                                    bold
+                                    customClass="text-lg"
+                                    help="Nama sekolah akan dicetak tebal dan besar pada Kop Surat"
+                                />
+
+                                {/* Baris 4: Alamat */}
+                                <InputGroup 
+                                    label="4. Alamat Lengkap & Kontak" 
                                     name="address" 
                                     value={form.address} 
                                     onChange={handleChange}
                                     type="textarea"
-                                    placeholder="Jl. Pendidikan No. 1, Desa ..., Kec..."
+                                    placeholder="Jl. Pramuka No. 1, Sario, Manado. Telp (0431) 86xxxx"
+                                    help="Termasuk Jalan, Desa/Kelurahan, Kecamatan, Kode Pos, No Telp, Email/Website."
                                 />
                                 
+                                {/* Kota Titimangsa */}
                                 <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100">
                                     <InputGroup 
-                                        label="Kota / Tempat Titimangsa" 
+                                        label="Kota / Tempat Titimangsa Surat" 
                                         name="city" 
                                         value={form.city} 
                                         onChange={handleChange}
-                                        placeholder="Contoh: Bandung"
+                                        placeholder="Contoh: Manado"
                                         icon={<MapPin size={16}/>}
-                                        help="Akan muncul di atas tanda tangan (Misal: Bandung, 20 Januari 2025)"
-                                        customClass="bg-white border-indigo-200 text-indigo-900"
+                                        help="Digunakan untuk tanggal surat di atas tanda tangan (Misal: Manado, 20 Januari 2025)"
+                                        customClass="bg-white border-indigo-200 text-indigo-900 font-bold"
                                     />
                                 </div>
                             </div>
                         </div>
                     </div>
                 );
+
             case 'kop':
                 return (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -152,25 +173,30 @@ const SchoolSettings = ({ settings, onSave }) => {
                                 />
                             </div>
                             <div className="mt-8 pt-6 border-t">
-                                <h3 className="font-bold text-sm text-slate-500 mb-3 uppercase tracking-wider">Pratinjau Kop (Sederhana)</h3>
-                                <div className="border p-6 bg-white flex items-center justify-between opacity-80 pointer-events-none select-none grayscale-[50%]">
-                                    <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-100 flex items-center justify-center border">
-                                        {form.logo ? <img src={form.logo} className="h-full object-contain" alt="Logo"/> : <span className="text-[10px]">Logo</span>}
-                                    </div>
-                                    <div className="text-center flex-1 px-2 md:px-4">
-                                        <div className="h-2 w-3/4 bg-slate-200 mx-auto mb-2 rounded"></div>
-                                        <div className="h-3 md:h-4 w-1/2 bg-slate-800 mx-auto mb-2 rounded"></div>
-                                        <div className="h-2 w-full bg-slate-200 mx-auto rounded"></div>
-                                    </div>
-                                    <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-100 flex items-center justify-center border">
-                                        {form.logo2 ? <img src={form.logo2} className="h-full object-contain" alt="Logo"/> : <span className="text-[10px]">Logo</span>}
+                                <h3 className="font-bold text-sm text-slate-500 mb-3 uppercase tracking-wider">Simulasi Layout Kop</h3>
+                                {/* PREVIEW KOP SURAT */}
+                                <div className="border p-4 md:p-6 bg-white opacity-90 select-none shadow-sm">
+                                    <div className="flex items-center justify-between gap-4 border-b-4 border-double border-black pb-2">
+                                        <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                                            {form.logo ? <img src={form.logo} className="h-full w-full object-contain" alt="Logo"/> : <div className="w-12 h-12 bg-slate-200 rounded-full"></div>}
+                                        </div>
+                                        <div className="text-center flex-1">
+                                            <h4 className="font-bold text-slate-600 text-xs md:text-sm uppercase tracking-wide">{form.government || 'PEMERINTAH PROVINSI ...'}</h4>
+                                            <h3 className="font-bold text-slate-700 text-sm md:text-base uppercase tracking-wide">{form.department || 'DINAS PENDIDIKAN ...'}</h3>
+                                            <h1 className="font-bold text-black text-lg md:text-xl uppercase my-1">{form.name || 'NAMA SEKOLAH'}</h1>
+                                            <p className="text-[10px] md:text-xs text-slate-500">{form.address || 'Alamat Sekolah...'}</p>
+                                        </div>
+                                        <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                                            {form.logo2 ? <img src={form.logo2} className="h-full w-full object-contain" alt="Logo"/> : <div className="w-12 h-12 bg-slate-200 rounded-full"></div>}
+                                        </div>
                                     </div>
                                 </div>
-                                <p className="text-center text-xs text-slate-400 mt-2">Ini hanya ilustrasi posisi. Hasil cetak asli akan menyesuaikan ukuran kertas.</p>
+                                <p className="text-center text-xs text-slate-400 mt-2">Tampilan di atas hanya pratinjau layout. Hasil cetak PDF mungkin sedikit berbeda.</p>
                             </div>
                         </div>
                     </div>
                 );
+
             case 'ttd':
                 return (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
