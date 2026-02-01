@@ -48,7 +48,7 @@ export default function App() {
         return onAuthStateChanged(auth, u => setAuthUser(u));
     }, []);
 
-    // 2. Fetch Users (Wait for auth)
+    // 2. Fetch Users (Wait for auth) -> KHUSUS ADMIN (Untuk Manajemen User)
     useEffect(() => {
         if (!authUser) return;
         const q = query(getCollectionRef(COLLECTION_PATHS.users));
@@ -63,29 +63,30 @@ export default function App() {
         return () => unsub();
     }, [authUser]);
 
-    // 3. Fetch Data (Only if logged in)
+    // 3. Fetch Data (Only if logged in) -> KHUSUS GURU (Data Pribadi)
     useEffect(() => {
         if (!appUser || !authUser) return;
 
-        // A. Fetch Students
+        // Jika Admin, tidak perlu load data siswa/jurnal/poin
+        if (appUser.role === 'admin') return;
+
+        // A. Fetch Students (Hanya milik guru ini)
         const unsubStudents = onSnapshot(getCollectionRef(COLLECTION_PATHS.students), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            if(appUser.role === 'guru') {
-                data = data.filter(d => d.teacherId === appUser.id);
-            }
+            // Filter ketat berdasarkan teacherId
+            data = data.filter(d => d.teacherId === appUser.id);
             setStudents(data);
         });
 
-        // B. Fetch Journals
+        // B. Fetch Journals (Hanya milik guru ini)
         const unsubJournals = onSnapshot(getCollectionRef(COLLECTION_PATHS.journals), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            if(appUser.role === 'guru') {
-                data = data.filter(d => d.teacherId === appUser.id);
-            }
+            // Filter ketat berdasarkan teacherId
+            data = data.filter(d => d.teacherId === appUser.id);
             setJournals(data);
         });
 
-        // C. Fetch Settings
+        // C. Fetch Settings (Identitas Sekolah - Milik Guru Ini)
         const unsubSettings = onSnapshot(getCollectionRef(COLLECTION_PATHS.settings), snap => {
             const allSettings = snap.docs.map(d => ({id: d.id, ...d.data()}));
             const mySet = allSettings.find(s => s.userId === appUser.id);
@@ -93,23 +94,30 @@ export default function App() {
             else setMySettings({});
         });
 
-        // D. Fetch Point Logs
+        // D. Fetch Point Logs (Catatan Poin - Milik Guru Ini)
         const unsubPoints = onSnapshot(collection(db, 'point_logs'), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            // Filter ketat berdasarkan teacherId
+            data = data.filter(d => d.teacherId === appUser.id);
             setPointLogs(data);
         });
 
-        // E. Fetch Master Data Points
-        const unsubMaster = onSnapshot(doc(db, 'settings', 'master_points'), (docSnap) => {
+        // E. Fetch Master Data Points (ISOLASI DATA: Dokumen Spesifik User)
+        // Nama dokumen sekarang: master_points_USERID
+        const masterPointsDocId = `master_points_${appUser.id}`;
+        const unsubMaster = onSnapshot(doc(db, 'settings', masterPointsDocId), (docSnap) => {
             if (docSnap.exists()) {
                 setMasterPoints(docSnap.data().items || []);
             } else {
+                // Jika belum ada data, set kosong (User harus input sendiri)
                 setMasterPoints([]);
             }
         });
 
-        // F. Fetch Sanction Rules
-        const unsubSanctions = onSnapshot(doc(db, 'settings', 'sanction_rules'), (docSnap) => {
+        // F. Fetch Sanction Rules (ISOLASI DATA: Dokumen Spesifik User)
+        // Nama dokumen sekarang: sanction_rules_USERID
+        const sanctionRulesDocId = `sanction_rules_${appUser.id}`;
+        const unsubSanctions = onSnapshot(doc(db, 'settings', sanctionRulesDocId), (docSnap) => {
             if (docSnap.exists()) {
                 setSanctionRules(docSnap.data().items || []);
             } else {
@@ -134,7 +142,9 @@ export default function App() {
                     setLoginError('Masa aktif akun telah habis. Hubungi Admin.');
                 } else {
                     setAppUser(user);
-                    setActiveTab('dashboard');
+                    // Redirect Admin ke Dashboard Admin, Guru ke Dashboard Guru
+                    if(user.role === 'admin') setActiveTab('dashboard');
+                    else setActiveTab('dashboard');
                 }
             } else {
                 setLoginError('Username atau Password salah!');
@@ -219,6 +229,7 @@ export default function App() {
     };
 
     const saveSettings = async (data) => {
+        // Settings juga disimpan per user
         if (mySettings.id) await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.settings), mySettings.id), data);
         else await addDoc(getCollectionRef(COLLECTION_PATHS.settings), { ...data, userId: appUser.id });
         alert("Pengaturan tersimpan.");
@@ -233,11 +244,9 @@ export default function App() {
         });
     };
 
-    // --- PERBAIKAN: FUNGSI UPDATE POIN ---
     const updatePointLog = async (data) => {
         const { id, ...rest } = data;
         try {
-            // Gunakan sintaks doc(db, 'nama_koleksi', id) yang benar
             await updateDoc(doc(db, 'point_logs', id), rest);
         } catch (e) {
             console.error("Gagal update poin:", e);
@@ -245,11 +254,9 @@ export default function App() {
         }
     };
 
-    // --- PERBAIKAN: FUNGSI DELETE POIN ---
     const deletePointLog = async (id) => {
         if(confirm("Hapus catatan poin ini? Data yang dihapus tidak bisa dikembalikan.")) {
             try {
-                // Gunakan sintaks doc(db, 'nama_koleksi', id) yang benar
                 await deleteDoc(doc(db, 'point_logs', id));
             } catch (e) {
                 console.error("Gagal hapus poin:", e);
@@ -258,16 +265,19 @@ export default function App() {
         }
     };
 
+    // --- FUNGSI SIMPAN MASTER DATA (ISOLATED) ---
     const saveMasterPoints = async (newItems) => {
         try {
-            await setDoc(doc(db, 'settings', 'master_points'), { items: newItems });
+            // Simpan ke dokumen spesifik user: master_points_USERID
+            await setDoc(doc(db, 'settings', `master_points_${appUser.id}`), { items: newItems });
             alert("Master data poin berhasil disimpan!");
         } catch (e) { console.error(e); alert("Gagal menyimpan."); }
     };
 
     const saveSanctionRules = async (newItems) => {
         try {
-            await setDoc(doc(db, 'settings', 'sanction_rules'), { items: newItems });
+            // Simpan ke dokumen spesifik user: sanction_rules_USERID
+            await setDoc(doc(db, 'settings', `sanction_rules_${appUser.id}`), { items: newItems });
             alert("Aturan sanksi berhasil disimpan!");
         } catch (e) { console.error(e); alert("Gagal menyimpan."); }
     };
@@ -281,12 +291,14 @@ export default function App() {
         <Layout activeTab={activeTab} setActiveTab={setActiveTab} userRole={appUser.role} userName={appUser.fullName} onLogout={handleLogout}>
             {appUser.role === 'admin' ? (
                 <>
+                    {/* ADMIN VIEW: Hanya untuk Manajemen User */}
                     {activeTab === 'dashboard' && <AdminDashboard users={allUsers} studentsCount={students.length} journalsCount={journals.length} />}
                     {activeTab === 'users' && <AdminUserManagement users={allUsers} />}
                     {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}
                 </>
             ) : (
                 <>
+                    {/* GURU VIEW: Menu Lengkap dengan Data Terisolasi */}
                     {activeTab === 'dashboard' && <GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} />}
                     
                     {activeTab === 'students' && (
@@ -329,7 +341,7 @@ export default function App() {
                         />
                     )}
 
-                    {/* Master Data: Data Poin */}
+                    {/* Master Data: Data Poin (Data ini sekarang UNIK per user) */}
                     {activeTab === 'master_points' && (
                         <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
                             <MasterDataSettings 
@@ -347,7 +359,7 @@ export default function App() {
                         <SchoolSettings settings={mySettings} onSave={saveSettings} />
                     )}
                     
-                    {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}\
+                    {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}
                 </>
             )}
         </Layout>
