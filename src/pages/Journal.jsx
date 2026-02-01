@@ -3,7 +3,7 @@ import {
     BookOpen, Search, X, Calendar, Edit, ClipboardList, 
     Save, RefreshCcw, Users, Clock, MapPin, AlignLeft, 
     CheckCircle2, Plus, History, ChevronRight, GraduationCap, 
-    Target, FileText, Activity
+    Target, FileText, Activity, Info
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 import { LAYANAN_TYPES, MASALAH_KATEGORI, SKKPD_LIST, TEKNIK_KONSELING } from '../utils/constants';
@@ -108,10 +108,13 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
         if (isClassical && !selectedClass) return alert("Silakan pilih Kelas Sasaran!");
         if (!isClassical && selectedStudents.length === 0) return alert("Pilih minimal satu siswa!");
 
+        // --- INI BAGIAN PENTING: OTOMATIS INPUT SEMESTER & TAHUN AJARAN ---
         const payload = { 
             ...form, 
-            academicYear: settings?.academicYear || '2024/2025',
+            // Mengambil data dari Settings (Pengaturan Sekolah)
+            academicYear: settings?.academicYear || '2024/2025', 
             semester: settings?.semester || 'Ganjil',
+            
             studentIds: isClassical ? [] : selectedStudents.map(s => s.id),
             studentNames: isClassical ? [`Kelas ${selectedClass}`] : selectedStudents.map(s => s.name),
             studentName: isClassical ? `Kelas ${selectedClass}` : (selectedStudents.length === 1 ? selectedStudents[0].name : `${selectedStudents.length} Siswa`),
@@ -119,6 +122,8 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
         };
         
         if (editingId) {
+            // Saat update, kita tetap update semesternya sesuai setting aktif 
+            // ATAU biarkan data lama (tergantung kebutuhan, di sini kita update ke aktif agar konsisten)
             onUpdate({ id: editingId, ...payload });
         } else {
             onAdd(payload);
@@ -155,18 +160,19 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
             {/* --- LEFT COLUMN: INPUT FORM --- */}
             <div className={`flex-1 overflow-y-auto p-4 md:p-6 md:w-5/12 lg:w-1/3 md:border-r border-slate-200 bg-white shadow-xl z-10 ${activeTab === 'history' ? 'hidden md:block' : 'block'}`}>
                 
-                <div className="mb-6 flex justify-between items-center border-b pb-4 border-slate-100">
-                    <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                <div className="mb-4">
+                    <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2 mb-2">
                         <div className="bg-blue-600 text-white p-1.5 rounded-lg">
                             <BookOpen size={20}/> 
                         </div>
                         {editingId ? 'Edit Jurnal' : 'Jurnal Baru'}
                     </h2>
-                    {editingId && (
-                        <button onClick={resetForm} className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-full font-bold hover:bg-red-200 transition-colors">
-                            Batal Edit
-                        </button>
-                    )}
+                    
+                    {/* INFO BANNER: Menampilkan Semester Aktif */}
+                    <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 border border-blue-100">
+                        <Info size={14}/>
+                        <span>Periode Aktif: <b>{settings?.semester || 'Semester ?'} {settings?.academicYear || ''}</b></span>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6 pb-20 md:pb-0">
@@ -340,6 +346,10 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
                                 </span>
                                 <span className={`text-[10px] font-extrabold px-2 py-1 rounded-md uppercase tracking-wide ${j.serviceType?.includes('Klasikal') ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                     {j.serviceType}
+                                </span>
+                                {/* Indikator Semester di List */}
+                                <span className="text-[10px] text-slate-400 px-2 border-l border-slate-200">
+                                    {j.semester} {j.academicYear}
                                 </span>
                             </div>
 

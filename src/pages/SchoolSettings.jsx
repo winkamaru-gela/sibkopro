@@ -12,6 +12,11 @@ const SchoolSettings = ({ settings, onSave }) => {
         semester: 'Ganjil',
         logo: '',
         logo2: '',
+        government: '',
+        department: '',
+        name: '',
+        address: '',
+        address2: '',
         ...settings 
     });
     
@@ -105,41 +110,49 @@ const SchoolSettings = ({ settings, onSave }) => {
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                     <InputGroup 
-                                        label="1. Instansi Induk / Pemerintah (Baris Atas)" 
+                                        label="1. Instansi Induk / Pemerintah (Baris 1)" 
                                         name="government" 
                                         value={form.government} 
                                         onChange={handleChange}
-                                        placeholder="PEMERINTAH PROVINSI SULAWESI UTARA"
+                                        placeholder="PEMERINTAH PROVINSI ..."
                                     />
                                     <InputGroup 
-                                        label="2. Nama Dinas / Yayasan (Baris Kedua)" 
+                                        label="2. Nama Dinas / Yayasan (Baris 2)" 
                                         name="department" 
                                         value={form.department} 
                                         onChange={handleChange}
-                                        placeholder="DINAS PENDIDIKAN DAERAH"
+                                        placeholder="DINAS PENDIDIKAN ..."
                                     />
                                 </div>
 
                                 <InputGroup 
-                                    label="3. Nama Sekolah (Utama)" 
+                                    label="3. Nama Sekolah (Baris 3 - Utama)" 
                                     name="name" 
                                     value={form.name} 
                                     onChange={handleChange}
-                                    placeholder="SMA NEGERI 1 MANADO"
+                                    placeholder="SMA NEGERI ..."
                                     bold
                                     customClass="text-lg"
                                 />
 
-                                <InputGroup 
-                                    label="4. Alamat Lengkap & Kontak" 
-                                    name="address" 
-                                    value={form.address} 
-                                    onChange={handleChange}
-                                    type="textarea"
-                                    placeholder="Jl. Pramuka No. 1, Sario, Manado. Telp (0431) 86xxxx"
-                                />
+                                <div className="grid grid-cols-1 gap-6">
+                                    <InputGroup 
+                                        label="4. Alamat Jalan / Desa (Baris 4)" 
+                                        name="address" 
+                                        value={form.address} 
+                                        onChange={handleChange}
+                                        placeholder="Jl. Raya No. 1, Desa..."
+                                    />
+                                    <InputGroup 
+                                        label="5. Kontak / Email / Website (Baris 5)" 
+                                        name="address2" 
+                                        value={form.address2} 
+                                        onChange={handleChange}
+                                        placeholder="Telp: (021) xxx | Email: sekolah@..."
+                                    />
+                                </div>
                                 
-                                <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100">
+                                <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100 mt-2">
                                     <InputGroup 
                                         label="Kota / Tempat Titimangsa Surat" 
                                         name="city" 
@@ -160,8 +173,8 @@ const SchoolSettings = ({ settings, onSave }) => {
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <div className="border-b pb-4 mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Logo Kop Surat</h2>
-                                <p className="text-sm text-slate-500">Anda dapat menggunakan file dari komputer atau tautan gambar (URL). Kosongkan jika hanya ingin menggunakan 1 logo.</p>
+                                <h2 className="text-lg font-bold text-slate-800">Logo & Preview Kop Surat</h2>
+                                <p className="text-sm text-slate-500">Pratinjau tampilan kop surat yang akan dicetak pada laporan.</p>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -186,26 +199,46 @@ const SchoolSettings = ({ settings, onSave }) => {
 
                             <div className="mt-8 pt-6 border-t">
                                 <h3 className="font-bold text-sm text-slate-500 mb-3 uppercase tracking-wider">Simulasi Layout Kop</h3>
-                                {/* PREVIEW KOP SURAT */}
-                                <div className="border p-4 md:p-6 bg-white select-none shadow-sm relative">
-                                    <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded">PREVIEW</div>
-                                    <div className="flex items-center justify-between gap-4 border-b-4 border-double border-black pb-2">
+                                
+                                {/* --- PREVIEW KOP SURAT (DIPERBARUI) --- */}
+                                <div className="border p-4 md:p-8 bg-white select-none shadow-sm relative overflow-hidden">
+                                    <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded border border-yellow-200">PREVIEW</div>
+                                    
+                                    {/* CONTAINER KOP */}
+                                    <div className="flex items-center justify-between gap-4 border-b-4 border-double border-black pb-4">
                                         
-                                        {/* Preview Logo Kiri */}
-                                        <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
-                                            {form.logo ? <img src={form.logo} className="h-full w-full object-contain" alt="Logo Kiri"/> : null}
+                                        {/* Logo Kiri */}
+                                        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                                            {form.logo ? <img src={form.logo} className="h-full w-full object-contain" alt="Logo Kiri"/> : <div className="w-full h-full bg-slate-100 border border-dashed flex items-center justify-center text-[10px] text-slate-400">Logo 1</div>}
                                         </div>
 
-                                        <div className="text-center flex-1">
-                                            <h4 className="font-bold text-slate-600 text-xs md:text-sm uppercase tracking-wide">{form.government || 'PEMERINTAH PROVINSI ...'}</h4>
-                                            <h3 className="font-bold text-slate-700 text-sm md:text-base uppercase tracking-wide">{form.department || 'DINAS PENDIDIKAN ...'}</h3>
-                                            <h1 className="font-bold text-black text-lg md:text-xl uppercase my-1">{form.name || 'NAMA SEKOLAH'}</h1>
-                                            <p className="text-[10px] md:text-xs text-slate-500">{form.address || 'Alamat Sekolah...'}</p>
+                                        {/* Teks Tengah (Centered & No Wrap) */}
+                                        <div className="text-center flex-1 min-w-0 px-2">
+                                            {/* Baris 1: Pemerintah */}
+                                            <h3 className="font-bold text-black text-sm md:text-lg uppercase tracking-wide whitespace-nowrap leading-tight">
+                                                {form.government || 'PEMERINTAH PROVINSI ...'}
+                                            </h3>
+                                            
+                                            {/* Baris 2: Dinas */}
+                                            <h3 className="font-bold text-black text-sm md:text-lg uppercase tracking-wide whitespace-nowrap leading-tight">
+                                                {form.department || 'DINAS PENDIDIKAN ...'}
+                                            </h3>
+                                            
+                                            {/* Baris 3: Sekolah (Lebih Tebal dikit, tapi ukuran sama) */}
+                                            <h1 className="font-extrabold text-black text-sm md:text-lg uppercase whitespace-nowrap leading-tight my-0.5">
+                                                {form.name || 'NAMA SEKOLAH'}
+                                            </h1>
+                                            
+                                            {/* Alamat (Font Serif, Italic, Kecil) */}
+                                            <div className="text-[10px] md:text-xs text-black font-serif italic leading-tight mt-1">
+                                                <p>{form.address || 'Alamat Lengkap Sekolah...'}</p>
+                                                {form.address2 && <p>{form.address2}</p>}
+                                            </div>
                                         </div>
 
-                                        {/* Preview Logo Kanan */}
-                                        <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
-                                            {form.logo2 ? <img src={form.logo2} className="h-full w-full object-contain" alt="Logo Kanan"/> : null}
+                                        {/* Logo Kanan */}
+                                        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                                            {form.logo2 ? <img src={form.logo2} className="h-full w-full object-contain" alt="Logo Kanan"/> : <div className="w-full h-full bg-slate-100 border border-dashed flex items-center justify-center text-[10px] text-slate-400">Logo 2</div>}
                                         </div>
                                     </div>
                                 </div>
@@ -373,7 +406,7 @@ const InputGroup = ({ label, name, value, onChange, placeholder, type = "text", 
         {type === 'textarea' ? (
             <textarea 
                 className={`w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm ${bold ? 'font-bold' : ''} ${customClass}`}
-                rows="3"
+                rows="2"
                 name={name}
                 value={value || ''}
                 onChange={onChange}

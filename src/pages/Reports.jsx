@@ -1,66 +1,27 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     Printer, Users, BookOpen, Map, FileText, FileCheck, 
-    Filter, ChevronRight, ChevronDown, Eye
+    Filter, ChevronRight, ChevronDown, Eye, Search, X, Calendar, List
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 
 // ==========================================
-// 1. KOMPONEN PORTAL PRATINJAU (CORE SOLUTION)
+// 1. KOMPONEN PORTAL PRATINJAU (TETAP SAMA)
 // ==========================================
 const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] bg-slate-900/95 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm print:bg-white print:static">
-            
-            {/* --- CSS ISOLASI CETAK (SOLUSI FINAL) --- */}
             <style>{`
                 @media print {
-                    /* 1. SETUP KERTAS */
                     @page { size: auto; margin: 10mm; }
-
-                    /* 2. SEMBUNYIKAN APLIKASI UTAMA */
-                    #root, .app-container, header, aside, nav { 
-                        display: none !important; 
-                    }
-                    
-                    /* 3. RESET BODY AGAR TIDAK TERKUNCI */
-                    html, body { 
-                        height: auto !important; 
-                        overflow: visible !important; 
-                        background-color: white !important; 
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-
-                    /* 4. TAMPILKAN MODAL INI SEBAGAI KONTEN UTAMA */
-                    .print-portal-root { 
-                        display: block !important; 
-                        position: absolute !important; 
-                        top: 0 !important; 
-                        left: 0 !important; 
-                        width: 100% !important; 
-                        height: auto !important;
-                        z-index: 9999 !important;
-                        background-color: white !important;
-                    }
-
-                    /* 5. BERSIHKAN TAMPILAN KERTAS (HAPUS SHADOW/BORDER SAAT CETAK) */
-                    .print-paper-content {
-                        box-shadow: none !important;
-                        border: none !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        width: 100% !important;
-                        max-width: none !important;
-                    }
-
-                    /* 6. SEMBUNYIKAN TOMBOL HEADER MODAL */
+                    #root, .app-container, header, aside, nav { display: none !important; }
+                    html, body { height: auto !important; overflow: visible !important; background-color: white !important; margin: 0 !important; padding: 0 !important; }
+                    .print-portal-root { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; z-index: 9999 !important; background-color: white !important; }
+                    .print-paper-content { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
                     .print-header-actions { display: none !important; }
-
-                    /* 7. HANDLING PAGE BREAK (Tabel & TTD) */
                     table { width: 100% !important; border-collapse: collapse !important; }
                     tr { page-break-inside: avoid; }
                     td, th { border: 1px solid black !important; padding: 4px; color: black !important; }
@@ -68,7 +29,6 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
                 }
             `}</style>
 
-            {/* Header Modal (Akan hilang saat print karena class 'print-header-actions') */}
             <div className="bg-slate-800 text-white px-4 py-3 shadow-md flex justify-between items-center flex-shrink-0 border-b border-slate-700 print-header-actions">
                 <div>
                     <h2 className="text-lg font-bold flex items-center gap-2 text-white">
@@ -79,19 +39,14 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
-                        Tutup
-                    </button>
-                    {/* TOMBOL CETAK LANGSUNG WINDOW.PRINT() */}
+                    <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">Tutup</button>
                     <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-blue-500/20 transition-all active:scale-95">
                         <Printer size={16}/> Cetak Sekarang
                     </button>
                 </div>
             </div>
 
-            {/* Area Konten (Scrollable di Layar, Full di Print) */}
             <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-slate-900/50 print:bg-white print:p-0 print:overflow-visible print-portal-root">
-                {/* Wrapper Kertas */}
                 <div className="print-paper-content bg-white text-slate-900 shadow-2xl w-full max-w-[215mm] min-h-[297mm] p-10 md:p-14 origin-top h-fit mx-auto">
                     {children}
                 </div>
@@ -102,18 +57,55 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
 };
 
 // ==========================================
-// 2. KOMPONEN UTAMA (LAYOUT GAYA SCHOOL SETTINGS)
+// 2. KOMPONEN UTAMA
 // ==========================================
 const Reports = ({ journals, students, settings }) => {
     const [activeTab, setActiveTab] = useState('journal');
     const [showPreview, setShowPreview] = useState(false);
 
-    // State Filter Global
+    // --- GLOBAL FILTER STATE ---
     const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
     const [filterSemester, setFilterSemester] = useState(settings?.semester || 'Ganjil');
     const [filterYear, setFilterYear] = useState(settings?.academicYear || '2024/2025');
+    
+    // --- STATE KHUSUS LAPORAN KLASIKAL ---
+    const [filterClass, setFilterClass] = useState(''); // Filter Kelas
+
+    // --- STATE KHUSUS REKAM JEJAK ---
     const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [studentSearch, setStudentSearch] = useState(''); // Pencarian Nama Siswa
+    const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+
+    // --- STATE KHUSUS BUKTI LAYANAN ---
     const [selectedJournalId, setSelectedJournalId] = useState('');
+    const [proofFilterMode, setProofFilterMode] = useState('month'); // 'all', 'month', 'year'
+    const [proofDate, setProofDate] = useState(new Date().toISOString().slice(0, 7));
+    const [proofSearch, setProofSearch] = useState(''); // Pencarian Teks Jurnal
+
+    // --- MEMOIZED DATA ---
+    const uniqueClasses = useMemo(() => [...new Set(students.map(s => s.class))].sort(), [students]);
+    
+    const filteredStudents = useMemo(() => {
+        if (!studentSearch) return [];
+        return students.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase())).slice(0, 10);
+    }, [students, studentSearch]);
+
+    const filteredJournalsForProof = useMemo(() => {
+        return journals.filter(j => {
+            // 1. Filter Waktu
+            let dateMatch = true;
+            if (proofFilterMode === 'month') dateMatch = j.date.startsWith(proofDate);
+            if (proofFilterMode === 'year') dateMatch = j.date.startsWith(proofDate.slice(0, 4));
+            
+            // 2. Filter Teks (Jenis Layanan / Deskripsi)
+            const searchLower = proofSearch.toLowerCase();
+            const textMatch = !proofSearch || 
+                j.serviceType.toLowerCase().includes(searchLower) || 
+                j.description.toLowerCase().includes(searchLower);
+
+            return dateMatch && textMatch;
+        }).sort((a,b) => b.date.localeCompare(a.date)); // Terbaru di atas
+    }, [journals, proofFilterMode, proofDate, proofSearch]);
 
     const REPORT_TYPES = [
         { id: 'journal', label: 'Jurnal Bulanan', icon: BookOpen, desc: 'Laporan aktivitas harian' },
@@ -127,7 +119,7 @@ const Reports = ({ journals, students, settings }) => {
     const renderDocumentContent = () => {
         switch(activeTab) {
             case 'journal': return <JournalContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} settings={settings} />;
-            case 'classReport': return <ClassReportContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} settings={settings} />;
+            case 'classReport': return <ClassReportContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} filterClass={filterClass} settings={settings} />;
             case 'individual': return <IndividualContent journals={journals} students={students} studentId={selectedStudentId} settings={settings} />;
             case 'riskMap': return <RiskMapContent students={students} year={filterYear} settings={settings} />;
             case 'serviceProof': return <ServiceProofContent journals={journals} journalId={selectedJournalId} settings={settings} />;
@@ -135,7 +127,7 @@ const Reports = ({ journals, students, settings }) => {
         }
     };
 
-    // Helper: Render Form Filter (Tampil di Kanan)
+    // Helper: Render Form Filter (Side Panel)
     const renderFilterForm = () => {
         const currentType = REPORT_TYPES.find(t => t.id === activeTab);
         
@@ -148,58 +140,155 @@ const Reports = ({ journals, students, settings }) => {
                     </div>
 
                     {/* FORM FILTER */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div className="grid grid-cols-1 gap-6 mb-6">
+                        
+                        {/* 1. FILTER UMUM (JURNAL & KLASIKAL) */}
                         {(activeTab === 'journal' || activeTab === 'classReport') && (
                             <>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Periode Bulan</label>
-                                    <input type="month" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
+                                    <input type="month" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                                 </div>
+                                
+                                {activeTab === 'classReport' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Kelas (Opsional)</label>
+                                        <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
+                                            <option value="">-- Semua Kelas --</option>
+                                            {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Semester</label>
-                                        <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
+                                        <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
                                             <option value="Ganjil">Ganjil</option>
                                             <option value="Genap">Genap</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tahun</label>
-                                        <input className="w-full p-2.5 border border-slate-300 rounded-lg text-sm" value={filterYear} onChange={e => setFilterYear(e.target.value)} />
+                                        <input className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterYear} onChange={e => setFilterYear(e.target.value)} />
                                     </div>
                                 </div>
                             </>
                         )}
 
+                        {/* 2. FILTER REKAM JEJAK (PENCARIAN SISWA) */}
                         {activeTab === 'individual' && (
-                            <div className="md:col-span-2">
+                            <div className="relative">
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari Nama Siswa</label>
-                                <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
-                                    <option value="">-- Pilih Siswa --</option>
-                                    {students.sort((a,b)=>a.name.localeCompare(b.name)).map(s => (
-                                        <option key={s.id} value={s.id}>{s.name} ({s.class})</option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                                    <input 
+                                        type="text" 
+                                        className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Ketik nama siswa..."
+                                        value={studentSearch}
+                                        onChange={e => { setStudentSearch(e.target.value); setIsStudentDropdownOpen(true); setSelectedStudentId(''); }}
+                                        onFocus={() => setIsStudentDropdownOpen(true)}
+                                    />
+                                    {selectedStudentId && (
+                                        <button onClick={() => { setSelectedStudentId(''); setStudentSearch(''); }} className="absolute right-3 top-2.5 text-slate-400 hover:text-red-500">
+                                            <X size={16}/>
+                                        </button>
+                                    )}
+                                </div>
+                                {isStudentDropdownOpen && studentSearch && !selectedStudentId && (
+                                    <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-48 overflow-y-auto">
+                                        {filteredStudents.length > 0 ? (
+                                            filteredStudents.map(s => (
+                                                <div 
+                                                    key={s.id} 
+                                                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0"
+                                                    onClick={() => {
+                                                        setSelectedStudentId(s.id);
+                                                        setStudentSearch(`${s.name} (${s.class})`);
+                                                        setIsStudentDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    <div className="font-bold text-slate-700">{s.name}</div>
+                                                    <div className="text-xs text-slate-500">{s.class} | {s.nisn}</div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-3 text-sm text-slate-400 text-center">Siswa tidak ditemukan</div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 
+                        {/* 3. FILTER BUKTI LAYANAN (JURNAL ADVANCED FILTER) */}
                         {activeTab === 'serviceProof' && (
-                            <div className="md:col-span-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Pilih Kegiatan Jurnal</label>
-                                <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm" value={selectedJournalId} onChange={e => setSelectedJournalId(e.target.value)}>
-                                    <option value="">-- Pilih Jurnal --</option>
-                                    {journals.sort((a,b)=>b.date.localeCompare(a.date)).map(j => (
-                                        <option key={j.id} value={j.id}>{formatIndoDate(j.date)} - {j.serviceType}</option>
+                            <div className="space-y-4">
+                                {/* Mode Filter */}
+                                <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    {['all', 'month', 'year'].map(mode => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => setProofFilterMode(mode)}
+                                            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${proofFilterMode === mode ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            {mode === 'all' ? 'Semua' : mode === 'month' ? 'Bulan' : 'Tahun'}
+                                        </button>
                                     ))}
-                                </select>
+                                </div>
+
+                                {/* Date Input */}
+                                {proofFilterMode !== 'all' && (
+                                    <div>
+                                        <input 
+                                            type={proofFilterMode === 'month' ? 'month' : 'number'} 
+                                            placeholder={proofFilterMode === 'year' ? 'YYYY' : ''}
+                                            className="w-full p-2.5 border border-slate-300 rounded-lg text-sm"
+                                            value={proofDate}
+                                            onChange={e => setProofDate(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Search Text */}
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                                    <input 
+                                        type="text" 
+                                        className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg text-sm"
+                                        placeholder="Cari kegiatan (Klasikal, Individu...)"
+                                        value={proofSearch}
+                                        onChange={e => setProofSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* List Journal Result */}
+                                <div className="border border-slate-200 rounded-lg max-h-60 overflow-y-auto bg-slate-50">
+                                    {filteredJournalsForProof.length > 0 ? (
+                                        filteredJournalsForProof.map(j => (
+                                            <div 
+                                                key={j.id}
+                                                onClick={() => setSelectedJournalId(j.id)}
+                                                className={`p-3 border-b last:border-0 cursor-pointer transition-colors ${selectedJournalId === j.id ? 'bg-blue-100 border-blue-200' : 'hover:bg-white'}`}
+                                            >
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-[10px] font-bold bg-white border px-1.5 rounded text-slate-600">{formatIndoDate(j.date)}</span>
+                                                    <span className="text-[10px] text-slate-400">{j.serviceType}</span>
+                                                </div>
+                                                <div className="text-xs font-bold text-slate-700 line-clamp-1">{j.studentName}</div>
+                                                <div className="text-[10px] text-slate-500 italic line-clamp-1">{j.description}</div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-4 text-center text-xs text-slate-400">Data jurnal tidak ditemukan.</div>
+                                    )}
+                                </div>
                             </div>
                         )}
                         
                         {activeTab === 'riskMap' && (
-                            <div className="md:col-span-2">
-                                <div className="bg-blue-50 text-blue-700 p-3 rounded text-sm">
-                                    Dokumen ini akan mencetak seluruh data siswa yang diurutkan berdasarkan tingkat kerawanan (Tinggi ke Rendah).
-                                </div>
+                            <div className="bg-blue-50 text-blue-700 p-3 rounded text-sm">
+                                Dokumen ini akan mencetak seluruh data siswa yang diurutkan berdasarkan tingkat kerawanan (Tinggi ke Rendah).
                             </div>
                         )}
                     </div>
@@ -233,16 +322,22 @@ const Reports = ({ journals, students, settings }) => {
                 </div>
             </div>
 
-            {/* MAIN CONTENT WRAPPER (Scrollable) */}
+            {/* MAIN CONTENT WRAPPER */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 w-full no-scrollbar">
                 <div className="max-w-7xl mx-auto">
                     
-                    {/* --- TAMPILAN MOBILE (ACCORDION) --- */}
+                    {/* MOBILE ACCORDION */}
                     <div className="md:hidden space-y-3">
                         {REPORT_TYPES.map(tab => (
                             <div key={tab.id} className={`bg-white rounded-xl border transition-all duration-300 overflow-hidden ${activeTab === tab.id ? 'border-blue-300 shadow-md ring-1 ring-blue-100' : 'border-slate-200'}`}>
                                 <button 
-                                    onClick={() => { setActiveTab(tab.id); setSelectedStudentId(''); setSelectedJournalId(''); }}
+                                    onClick={() => { 
+                                        setActiveTab(tab.id); 
+                                        // Reset selection states when changing tabs
+                                        setSelectedStudentId(''); 
+                                        setStudentSearch('');
+                                        setSelectedJournalId('');
+                                    }}
                                     className={`w-full flex items-center justify-between p-4 text-left transition-colors ${activeTab === tab.id ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}`}
                                 >
                                     <div className="flex items-center gap-3">
@@ -257,7 +352,6 @@ const Reports = ({ journals, students, settings }) => {
                                     {activeTab === tab.id ? <ChevronDown size={20}/> : <ChevronRight size={20} className="text-slate-400"/>}
                                 </button>
                                 
-                                {/* Form Filter Mobile (Muncul di bawah jika aktif) */}
                                 {activeTab === tab.id && (
                                     <div className="p-4 border-t border-blue-100 bg-slate-50/50">
                                         {renderFilterForm()}
@@ -267,10 +361,8 @@ const Reports = ({ journals, students, settings }) => {
                         ))}
                     </div>
 
-                    {/* --- TAMPILAN DESKTOP (SIDEBAR KIRI + KONTEN KANAN) --- */}
+                    {/* DESKTOP LAYOUT */}
                     <div className="hidden md:flex gap-6 items-start h-full">
-                        
-                        {/* Sidebar Menu (Mirip SchoolSettings) */}
                         <aside className="w-72 flex-shrink-0">
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-6">
                                 <div className="p-4 border-b bg-slate-50">
@@ -280,7 +372,12 @@ const Reports = ({ journals, students, settings }) => {
                                     {REPORT_TYPES.map(tab => (
                                         <button
                                             key={tab.id}
-                                            onClick={() => { setActiveTab(tab.id); setSelectedStudentId(''); setSelectedJournalId(''); }}
+                                            onClick={() => { 
+                                                setActiveTab(tab.id); 
+                                                setSelectedStudentId(''); 
+                                                setStudentSearch('');
+                                                setSelectedJournalId('');
+                                            }}
                                             className={`w-full flex items-center text-left px-3 py-3 rounded-lg transition-all ${
                                                 activeTab === tab.id 
                                                 ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 shadow-sm' 
@@ -301,7 +398,6 @@ const Reports = ({ journals, students, settings }) => {
                             </div>
                         </aside>
 
-                        {/* Konten Utama (Form Filter & Action) */}
                         <main className="flex-1 w-full">
                             {renderFilterForm()}
                         </main>
@@ -310,7 +406,7 @@ const Reports = ({ journals, students, settings }) => {
                 </div>
             </div>
 
-            {/* --- MODAL PRATINJAU (POPUP KHUSUS CETAK) --- */}
+            {/* MODAL PRATINJAU */}
             <PrintPreviewModal 
                 isOpen={showPreview} 
                 onClose={() => setShowPreview(false)}
@@ -324,7 +420,7 @@ const Reports = ({ journals, students, settings }) => {
 };
 
 // ==========================================
-// 3. KONTEN DOKUMEN (TEMPLATE CETAK)
+// 3. KONTEN DOKUMEN CETAK
 // ==========================================
 
 const JournalContent = ({ journals, month, semester, year, settings }) => {
@@ -377,11 +473,14 @@ const JournalContent = ({ journals, month, semester, year, settings }) => {
     );
 };
 
-const ClassReportContent = ({ journals, month, semester, year, settings }) => {
+const ClassReportContent = ({ journals, month, semester, year, filterClass, settings }) => {
+    // UPDATED: Tambahkan filter Class
     const data = journals.filter(j => 
         j.date.startsWith(month) && 
         j.serviceType === 'Bimbingan Klasikal' &&
-        (!j.semester || j.semester === semester)
+        (!j.semester || j.semester === semester) &&
+        (!j.academicYear || j.academicYear === year) &&
+        (!filterClass || j.studentName.includes(filterClass) || j.targetClass === filterClass)
     ).sort((a,b) => a.date.localeCompare(b.date));
 
     return (
@@ -389,7 +488,10 @@ const ClassReportContent = ({ journals, month, semester, year, settings }) => {
             <KopSurat settings={settings} />
             <div className="text-center mb-6">
                 <h3 className="text-lg font-bold underline uppercase">LAPORAN LAYANAN KLASIKAL</h3>
-                <p className="text-sm mt-1">Bulan: {new Date(month).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+                <p className="text-sm mt-1">
+                    Bulan: {new Date(month).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} 
+                    {filterClass && <span> | Kelas: {filterClass}</span>}
+                </p>
             </div>
             <table className="w-full border-collapse border border-black text-xs">
                 <thead>
@@ -570,16 +672,25 @@ const ServiceProofContent = ({ journals, journalId, settings }) => {
 
 const KopSurat = ({ settings }) => (
     <div className="flex items-center justify-between border-b-4 border-double border-black pb-4 mb-6">
-        <div className="w-20 h-20 flex items-center justify-center">
+        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
             {settings?.logo && <img src={settings.logo} className="h-full object-contain" alt="Logo" />}
         </div>
-        <div className="flex-1 text-center px-4">
-            {settings?.government && <h4 className="font-bold text-black text-sm md:text-base uppercase tracking-wide leading-tight">{settings.government}</h4>}
-            {settings?.department && <h3 className="font-bold text-black text-base md:text-lg uppercase tracking-wide leading-tight">{settings.department}</h3>}
-            <h1 className="font-extrabold text-black text-xl md:text-2xl uppercase my-1 leading-none tracking-tight">{settings?.name || 'NAMA SEKOLAH'}</h1>
-            <p className="text-xs md:text-sm text-black font-serif italic mt-1 leading-tight">{settings?.address || 'Alamat Sekolah'}</p>
+        <div className="flex-1 text-center px-4 min-w-0">
+            <h3 className="font-bold text-black text-lg md:text-xl uppercase tracking-wide whitespace-nowrap leading-tight">
+                {settings?.government || ''}
+            </h3>
+            <h3 className="font-bold text-black text-lg md:text-xl uppercase tracking-wide whitespace-nowrap leading-tight">
+                {settings?.department || ''}
+            </h3>
+            <h1 className="font-extrabold text-black text-lg md:text-xl uppercase whitespace-nowrap leading-tight my-1">
+                {settings?.name || 'NAMA SEKOLAH'}
+            </h1>
+            <div className="text-xs text-black font-serif italic leading-tight mt-1">
+                <p>{settings?.address || 'Alamat Sekolah...'}</p>
+                {settings?.address2 && <p>{settings.address2}</p>}
+            </div>
         </div>
-        <div className="w-20 h-20 flex items-center justify-center">
+        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
             {settings?.logo2 && <img src={settings.logo2} className="h-full object-contain" alt="Logo" />}
         </div>
     </div>
