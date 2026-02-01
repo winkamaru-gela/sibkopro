@@ -1,10 +1,13 @@
-// src/components/Layout.jsx
 import React, { useState, useEffect } from 'react';
-// Tambahkan 'Database' atau gunakan 'List' untuk ikon Master Data
-import { Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, X, List, Trophy, Database } from 'lucide-react';
+import { 
+    Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, 
+    X, List, Trophy, Database, ChevronDown, ChevronRight, School,
+    BookUser // Ikon baru untuk Buku Poin
+} from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogout }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [expandedMenu, setExpandedMenu] = useState(null);
 
     useEffect(() => {
         const handleResize = () => {
@@ -19,6 +22,7 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Definisi Menu
     const menuItems = userRole === 'admin' 
         ? [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -27,25 +31,54 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
           ]
         : [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
-            { id: 'students', label: 'Data Siswa', icon: Users },
+            
+            // 1. Jurnal Harian (Posisi Ditukar)
             { id: 'journal', label: 'Jurnal Harian', icon: BookOpen },
             
-            // Menu Operasional Poin
-            { id: 'points', label: 'Catat Poin', icon: Trophy }, 
+            // 2. Data Siswa (Posisi Ditukar)
+            { id: 'students', label: 'Data Siswa', icon: Users },
             
-            // --- MENU MASTER DATA (DIPISAH) ---
-            { id: 'master_points', label: 'Master Data Poin', icon: Database }, 
+            // 3. Menu Operasional Poin
+            { id: 'points', label: 'Catat Poin Siswa', icon: Trophy }, 
             
+            // 4. Buku Poin Siswa (Menu Baru)
+            { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser },
+
+            // 5. Menu Laporan
             { id: 'reports', label: 'Laporan & Cetak', icon: Printer },
-            
-            // --- MENU PENGATURAN SEKOLAH (DIPISAH) ---
-            { id: 'settings', label: 'Pengaturan Sekolah', icon: Settings }, 
+
+            // 6. Master Data (Group) - Di bawah Laporan
+            { 
+                id: 'master_group', 
+                label: 'Master Data', 
+                icon: Database,
+                children: [
+                    { id: 'master_points', label: 'Data Poin', icon: List },
+                    { id: 'settings', label: 'Pengaturan Sekolah', icon: School }
+                ]
+            },
             
             { id: 'account', label: 'Akun Saya', icon: UserCog }
           ];
 
-    const handleMenuClick = (id) => {
-        setActiveTab(id);
+    const handleMenuClick = (item) => {
+        if (item.children) {
+            if (!sidebarOpen && window.innerWidth >= 768) {
+                setSidebarOpen(true);
+                setTimeout(() => setExpandedMenu(item.id), 50);
+            } else {
+                setExpandedMenu(expandedMenu === item.id ? null : item.id);
+            }
+        } else {
+            setActiveTab(item.id);
+            if (window.innerWidth < 768) {
+                setSidebarOpen(false);
+            }
+        }
+    };
+
+    const handleSubMenuClick = (childId) => {
+        setActiveTab(childId);
         if (window.innerWidth < 768) {
             setSidebarOpen(false);
         }
@@ -53,6 +86,7 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
 
     return (
         <div className="flex h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden print:bg-white print:h-auto">
+            {/* Overlay Mobile */}
             {sidebarOpen && (
                 <div 
                     className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
@@ -60,6 +94,7 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                 />
             )}
 
+            {/* Sidebar */}
             <aside className={`
                 bg-slate-900 text-white flex flex-col 
                 fixed inset-y-0 left-0 z-50 h-full w-64
@@ -72,7 +107,7 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold flex-shrink-0">S</div>
                         {(sidebarOpen || window.innerWidth < 768) && (
-                            <div>
+                            <div className="animate-in fade-in duration-300">
                                 <h1 className="font-bold tracking-wider">SIBKO</h1>
                                 <p className="text-[10px] text-slate-400 uppercase">{userRole === 'admin' ? 'Super Admin' : 'Guru BK'}</p>
                             </div>
@@ -83,17 +118,51 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                     </button>
                 </div>
 
-                <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+                <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
                     {menuItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => handleMenuClick(item.id)}
-                            className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                            title={!sidebarOpen ? item.label : ''}
-                        >
-                            <item.icon size={20} className="flex-shrink-0"/>
-                            {(sidebarOpen || window.innerWidth < 768) && <span className="ml-3 font-medium text-sm whitespace-nowrap">{item.label}</span>}
-                        </button>
+                        <div key={item.id}>
+                            {/* ITEM MENU UTAMA */}
+                            <button
+                                onClick={() => handleMenuClick(item)}
+                                className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+                                    (activeTab === item.id || (item.children && item.children.find(c => c.id === activeTab))) 
+                                    ? 'bg-slate-800 text-white' 
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                }`}
+                                title={!sidebarOpen ? item.label : ''}
+                            >
+                                <div className="flex items-center">
+                                    <item.icon size={20} className={`flex-shrink-0 ${(activeTab === item.id || (item.children && item.children.find(c => c.id === activeTab))) ? 'text-blue-500' : ''}`}/>
+                                    {(sidebarOpen || window.innerWidth < 768) && (
+                                        <span className="ml-3 font-medium text-sm whitespace-nowrap">{item.label}</span>
+                                    )}
+                                </div>
+                                {/* Icon Panah untuk Dropdown */}
+                                {item.children && (sidebarOpen || window.innerWidth < 768) && (
+                                    expandedMenu === item.id ? <ChevronDown size={16}/> : <ChevronRight size={16}/>
+                                )}
+                            </button>
+
+                            {/* SUBMENU (CHILDREN) */}
+                            {item.children && expandedMenu === item.id && (sidebarOpen || window.innerWidth < 768) && (
+                                <div className="ml-4 mt-1 space-y-1 border-l border-slate-700 pl-2 animate-in slide-in-from-left-2 duration-200">
+                                    {item.children.map(child => (
+                                        <button
+                                            key={child.id}
+                                            onClick={() => handleSubMenuClick(child.id)}
+                                            className={`w-full flex items-center p-2.5 rounded-lg text-sm transition-colors ${
+                                                activeTab === child.id 
+                                                ? 'bg-blue-600 text-white shadow-sm' 
+                                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                            }`}
+                                        >
+                                            {child.icon && <child.icon size={16} className="mr-2 opacity-80"/>}
+                                            <span>{child.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     ))}
                 </nav>
 

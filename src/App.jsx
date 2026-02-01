@@ -21,6 +21,7 @@ import SchoolSettings from './pages/SchoolSettings';
 import AccountSettings from './pages/AccountSettings';
 import PointManager from './pages/PointManager';         
 import MasterDataSettings from './pages/MasterDataSettings'; 
+import StudentPointBook from './pages/StudentPointBook';
 
 export default function App() {
     const [authUser, setAuthUser] = useState(null); 
@@ -39,7 +40,7 @@ export default function App() {
     // State Poin, Master Data & Sanctions
     const [pointLogs, setPointLogs] = useState([]);       
     const [masterPoints, setMasterPoints] = useState([]); 
-    const [sanctionRules, setSanctionRules] = useState([]); // <--- STATE BARU
+    const [sanctionRules, setSanctionRules] = useState([]); 
 
     // 1. Init Firebase Auth
     useEffect(() => {
@@ -107,7 +108,7 @@ export default function App() {
             }
         });
 
-        // F. Fetch Sanction Rules (BARU)
+        // F. Fetch Sanction Rules
         const unsubSanctions = onSnapshot(doc(db, 'settings', 'sanction_rules'), (docSnap) => {
             if (docSnap.exists()) {
                 setSanctionRules(docSnap.data().items || []);
@@ -232,8 +233,29 @@ export default function App() {
         });
     };
 
+    // --- PERBAIKAN: FUNGSI UPDATE POIN ---
+    const updatePointLog = async (data) => {
+        const { id, ...rest } = data;
+        try {
+            // Gunakan sintaks doc(db, 'nama_koleksi', id) yang benar
+            await updateDoc(doc(db, 'point_logs', id), rest);
+        } catch (e) {
+            console.error("Gagal update poin:", e);
+            alert("Gagal memperbarui data poin.");
+        }
+    };
+
+    // --- PERBAIKAN: FUNGSI DELETE POIN ---
     const deletePointLog = async (id) => {
-        await deleteDoc(doc(collection(db, 'point_logs'), id));
+        if(confirm("Hapus catatan poin ini? Data yang dihapus tidak bisa dikembalikan.")) {
+            try {
+                // Gunakan sintaks doc(db, 'nama_koleksi', id) yang benar
+                await deleteDoc(doc(db, 'point_logs', id));
+            } catch (e) {
+                console.error("Gagal hapus poin:", e);
+                alert("Gagal menghapus data.");
+            }
+        }
     };
 
     const saveMasterPoints = async (newItems) => {
@@ -243,7 +265,6 @@ export default function App() {
         } catch (e) { console.error(e); alert("Gagal menyimpan."); }
     };
 
-    // --- BARU: SIMPAN ATURAN SANKSI ---
     const saveSanctionRules = async (newItems) => {
         try {
             await setDoc(doc(db, 'settings', 'sanction_rules'), { items: newItems });
@@ -268,37 +289,54 @@ export default function App() {
                 <>
                     {activeTab === 'dashboard' && <GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} />}
                     
-                    {activeTab === 'students' && <StudentManager students={students} 
-                    
-                    // --- TAMBAHKAN DUA BARIS INI ---
-        pointLogs={pointLogs}         // Kirim Data Poin
-        sanctionRules={sanctionRules} // Kirim Aturan Sanksi
-        // -------------------------------
-                    
-                    journals={journals} onAdd={addStudent} onImport={importStudents} onMoveClass={handleMoveClass} onEdit={updateStudent} onDelete={deleteStudent} />}
+                    {activeTab === 'students' && (
+                        <StudentManager 
+                            students={students} 
+                            journals={journals}
+                            pointLogs={pointLogs}
+                            sanctionRules={sanctionRules}
+                            onAdd={addStudent} 
+                            onImport={importStudents} 
+                            onMoveClass={handleMoveClass} 
+                            onEdit={updateStudent} 
+                            onDelete={deleteStudent} 
+                        />
+                    )}
                     
                     {activeTab === 'journal' && <Journal students={students} journals={journals} onAdd={addJournal} onUpdate={updateJournal} settings={mySettings} />}
                     
-                    {/* Halaman Buku Saku - SEKARANG MENERIMA RULES SANKSI */}
+                    {/* Halaman Catat Poin */}
                     {activeTab === 'points' && (
                         <PointManager 
                             students={students} 
                             pointLogs={pointLogs} 
                             masterPoints={masterPoints} 
-                            sanctionRules={sanctionRules} // <--- Pass Props Baru
+                            sanctionRules={sanctionRules} 
                             onAddPoint={addPointLog} 
+                            onUpdatePoint={updatePointLog} 
                             onDeletePoint={deletePointLog} 
                         />
                     )}
 
-                    {/* Halaman Master Data Poin - SEKARANG MENERIMA PROPS BARU */}
+                    {/* Buku Poin Siswa */}
+                    {activeTab === 'point_book' && (
+                        <StudentPointBook 
+                            students={students} 
+                            pointLogs={pointLogs}
+                            journals={journals}
+                            settings={mySettings}
+                            sanctionRules={sanctionRules}
+                        />
+                    )}
+
+                    {/* Master Data: Data Poin */}
                     {activeTab === 'master_points' && (
                         <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
                             <MasterDataSettings 
                                 masterPoints={masterPoints} 
-                                onSavePoints={saveMasterPoints} // Ubah nama props agar jelas
-                                sanctionRules={sanctionRules}   // <--- Pass Props Baru
-                                onSaveSanctions={saveSanctionRules} // <--- Pass Props Baru
+                                onSavePoints={saveMasterPoints}
+                                sanctionRules={sanctionRules}
+                                onSaveSanctions={saveSanctionRules}
                             />
                         </div>
                     )}
@@ -309,7 +347,7 @@ export default function App() {
                         <SchoolSettings settings={mySettings} onSave={saveSettings} />
                     )}
                     
-                    {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}
+                    {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}\
                 </>
             )}
         </Layout>

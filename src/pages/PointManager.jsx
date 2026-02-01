@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
     Trophy, AlertTriangle, Search, PlusCircle, 
-    ChevronRight, AlertOctagon, Calendar, Check, ChevronDown, X
+    ChevronRight, AlertOctagon, Calendar, Check, ChevronDown, X,
+    Edit, Trash2, RefreshCcw
 } from 'lucide-react';
 
-const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddPoint, onDeletePoint }) => {
+const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddPoint, onUpdatePoint, onDeletePoint }) => {
     // State Tab
     const [activeTab, setActiveTab] = useState('violation');
     
@@ -13,11 +14,14 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
     const [selectedStudent, setSelectedStudent] = useState(null); 
     const [isInputModalOpen, setIsInputModalOpen] = useState(false); 
     
+    // State untuk Editing
+    const [editingLogId, setEditingLogId] = useState(null);
+
     // State untuk Custom Dropdown dengan Search
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [dropdownSearch, setDropdownSearch] = useState(''); // State pencarian dalam dropdown
+    const [dropdownSearch, setDropdownSearch] = useState(''); 
     const dropdownRef = useRef(null);
-    const searchInputRef = useRef(null); // Ref untuk auto-focus input search
+    const searchInputRef = useRef(null);
 
     // State Form Input
     const [formData, setFormData] = useState({
@@ -27,15 +31,6 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
         date: new Date().toISOString().slice(0, 10)
     });
 
-    // Reset saat ganti tab
-    useEffect(() => {
-        setSearchTerm('');
-        setSelectedStudent(null);
-        setIsInputModalOpen(false);
-        setIsDropdownOpen(false);
-        setDropdownSearch('');
-    }, [activeTab]);
-
     // Auto-focus ke input search saat dropdown dibuka
     useEffect(() => {
         if (isDropdownOpen && searchInputRef.current) {
@@ -43,7 +38,7 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
                 searchInputRef.current.focus();
             }, 100);
         } else {
-            setDropdownSearch(''); // Reset search saat ditutup
+            setDropdownSearch(''); 
         }
     }, [isDropdownOpen]);
 
@@ -57,6 +52,25 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    const resetForm = () => {
+        setFormData({
+            code: '', 
+            value: 5,
+            description: '',
+            date: new Date().toISOString().slice(0, 10)
+        });
+        setEditingLogId(null);
+    };
+
+    // Fungsi ganti tab manual (Reset form agar bersih)
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        resetForm();
+        setSearchTerm('');
+        setSelectedStudent(null);
+        setIsInputModalOpen(false);
+    };
 
     // 1. Kalkulasi Poin Siswa
     const studentPoints = useMemo(() => {
@@ -95,7 +109,7 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
         ).sort((a,b) => a.name.localeCompare(b.name)); 
     }, [studentPoints, searchTerm]);
 
-    // 3. Filter Master Data (Dropdown Options) + Fitur Cari di Dropdown
+    // 3. Filter Master Data
     const availableOptions = useMemo(() => {
         return (masterPoints || []).filter(item => item.type === activeTab);
     }, [masterPoints, activeTab]);
@@ -114,40 +128,63 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
     const handleStudentClick = (student) => {
         setSelectedStudent(student);
         setIsInputModalOpen(true);
-        setFormData({
-            code: '',
-            value: 5,
-            description: '',
-            date: new Date().toISOString().slice(0, 10)
-        });
+        resetForm();
     };
 
     const handleSelectOption = (item) => {
         setFormData(prev => ({
             ...prev,
             code: String(item.code),
-            description: item.label,
+            description: `${item.code} - ${item.label}`, 
             value: item.point
         }));
         setIsDropdownOpen(false);
+    };
+
+    // EDIT LOGIC
+    const handleEditLog = (log) => {
+        // Penting: Ubah tab tanpa mereset form!
+        if (log.type !== activeTab) {
+            setActiveTab(log.type);
+        }
+        
+        setEditingLogId(log.id);
+        setFormData({
+            code: log.code || '',
+            value: log.value,
+            description: log.description,
+            date: log.date
+        });
+        
+        // Scroll ke atas agar form terlihat
+        const modalContainer = document.getElementById('modal-content-container');
+        if(modalContainer) modalContainer.scrollTop = 0;
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!selectedStudent) return;
         
-        onAddPoint({
+        const payload = {
             type: activeTab,
             value: formData.value,
             description: formData.description,
             studentId: selectedStudent.id,
             studentName: selectedStudent.name,
             class: selectedStudent.class,
-            date: formData.date 
-        });
+            date: formData.date,
+            code: formData.code 
+        };
+
+        if (editingLogId) {
+            onUpdatePoint({ id: editingLogId, ...payload });
+            alert("Data berhasil diperbarui!");
+        } else {
+            onAddPoint(payload);
+            alert(`${activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'} berhasil dicatat!`);
+        }
         
-        setIsInputModalOpen(false);
-        alert(`${activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'} berhasil dicatat!`);
+        resetForm();
     };
 
     return (
@@ -164,7 +201,7 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
 
                 <div className="flex gap-2">
                     <button 
-                        onClick={() => setActiveTab('violation')}
+                        onClick={() => handleTabChange('violation')}
                         className={`flex-1 py-3 text-sm font-bold border-b-4 transition-all flex items-center justify-center gap-2 ${
                             activeTab === 'violation' 
                             ? 'border-red-500 text-red-600 bg-red-50/50' 
@@ -174,7 +211,7 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
                         <AlertTriangle size={18}/> Catat Pelanggaran
                     </button>
                     <button 
-                        onClick={() => setActiveTab('achievement')}
+                        onClick={() => handleTabChange('achievement')}
                         className={`flex-1 py-3 text-sm font-bold border-b-4 transition-all flex items-center justify-center gap-2 ${
                             activeTab === 'achievement' 
                             ? 'border-green-500 text-green-600 bg-green-50/50' 
@@ -260,18 +297,18 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
                         } rounded-t-2xl flex-shrink-0`}>
                             <div>
                                 <h3 className="font-bold text-lg flex items-center gap-2">
-                                    {activeTab === 'violation' ? <AlertTriangle size={20}/> : <Trophy size={20}/>}
-                                    {activeTab === 'violation' ? 'Catat Pelanggaran' : 'Catat Prestasi'}
+                                    {editingLogId ? <Edit size={20}/> : (activeTab === 'violation' ? <AlertTriangle size={20}/> : <Trophy size={20}/>)}
+                                    {editingLogId ? 'Edit Catatan' : (activeTab === 'violation' ? 'Catat Pelanggaran' : 'Catat Prestasi')}
                                 </h3>
                                 <p className="text-xs opacity-80">{selectedStudent.name} - {selectedStudent.class}</p>
                             </div>
-                            <button onClick={() => setIsInputModalOpen(false)} className="p-2 bg-white/50 rounded-full hover:bg-white/80 transition-colors">
+                            <button onClick={() => { setIsInputModalOpen(false); resetForm(); }} className="p-2 bg-white/50 rounded-full hover:bg-white/80 transition-colors">
                                 <X size={20}/>
                             </button>
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-5 overflow-y-auto space-y-5">
+                        <div id="modal-content-container" className="p-5 overflow-y-auto space-y-5">
                             
                             {/* === SEARCHABLE CUSTOM DROPDOWN === */}
                             <div className="relative" ref={dropdownRef}>
@@ -364,7 +401,7 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
                                     <div className="relative">
                                         <Calendar className="absolute left-3 top-3 text-slate-400" size={16}/>
                                         <input 
-                                            type="date"
+                                            type="date" 
                                             className="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-sm"
                                             value={formData.date}
                                             onChange={e => setFormData({...formData, date: e.target.value})}
@@ -383,38 +420,69 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
                                 />
                             </div>
 
-                            {/* History Singkat */}
+                            {/* History Singkat dengan EDIT & DELETE */}
                             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                 <div className="flex justify-between text-xs mb-2">
                                     <span className="font-bold text-slate-500">Riwayat Terakhir</span>
-                                    <span className="text-slate-400">Total Poin Saat Ini: <b className="text-slate-800">{selectedStudent.netScore}</b></span>
+                                    <span className="text-slate-400">Total Poin Saat Ini: 
+                                        <b className={`ml-1 ${selectedStudent.netScore > 0 ? 'text-red-600' : selectedStudent.netScore < 0 ? 'text-green-600' : 'text-slate-800'}`}>
+                                            {Math.abs(selectedStudent.netScore)}
+                                        </b>
+                                    </span>
                                 </div>
-                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                    {selectedStudent.logs.slice(0, 3).map(log => (
-                                        <div key={log.id} className="text-xs flex justify-between border-b border-slate-100 pb-1 last:border-0">
-                                            <span className="truncate flex-1 pr-2 text-slate-600">{log.description}</span>
-                                            <span className={`font-bold ${log.type === 'violation' ? 'text-red-500' : 'text-green-500'}`}>
-                                                {log.value}
-                                            </span>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                    {selectedStudent.logs.map(log => (
+                                        <div key={log.id} className={`text-xs flex justify-between items-start border-b border-slate-200 pb-2 last:border-0 p-2 rounded ${editingLogId === log.id ? 'bg-blue-50 ring-1 ring-blue-300' : 'hover:bg-white'}`}>
+                                            <div className="flex-1 pr-2">
+                                                <span className={`font-bold block mb-0.5 uppercase ${log.type === 'violation' ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {log.type === 'violation' ? 'Pelanggaran' : 'Prestasi'} - {log.value} Poin
+                                                </span>
+                                                <span className="text-slate-600 block line-clamp-2">{log.description}</span>
+                                                <span className="text-slate-400 text-[10px] mt-1 block">{log.date}</span>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button 
+                                                    onClick={() => handleEditLog(log)} 
+                                                    className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                                                    title="Edit"
+                                                >
+                                                    <Edit size={14}/>
+                                                </button>
+                                                <button 
+                                                    onClick={() => onDeletePoint(log.id)} 
+                                                    className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                                    title="Hapus"
+                                                >
+                                                    <Trash2 size={14}/>
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
-                                    {selectedStudent.logs.length === 0 && <p className="text-xs text-slate-400 italic">Belum ada data.</p>}
+                                    {selectedStudent.logs.length === 0 && <p className="text-xs text-slate-400 italic text-center p-4">Belum ada data.</p>}
                                 </div>
                             </div>
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-4 border-t bg-slate-50 rounded-b-2xl">
+                        <div className="p-4 border-t bg-slate-50 rounded-b-2xl flex gap-2">
+                            {editingLogId && (
+                                <button 
+                                    onClick={resetForm}
+                                    className="px-4 py-3.5 rounded-xl bg-slate-200 text-slate-600 font-bold hover:bg-slate-300 transition-colors text-sm"
+                                >
+                                    Batal
+                                </button>
+                            )}
                             <button 
                                 onClick={handleSubmit}
-                                className={`w-full py-3.5 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95 ${
-                                    activeTab === 'violation' 
-                                    ? 'bg-red-600 hover:bg-red-700 shadow-red-200' 
-                                    : 'bg-green-600 hover:bg-green-700 shadow-green-200'
+                                className={`flex-1 py-3.5 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95 ${
+                                    editingLogId 
+                                        ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'
+                                        : (activeTab === 'violation' ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-green-600 hover:bg-green-700 shadow-green-200')
                                 }`}
                             >
-                                <PlusCircle size={20}/> 
-                                Simpan {activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'}
+                                {editingLogId ? <RefreshCcw size={20}/> : <PlusCircle size={20}/>} 
+                                {editingLogId ? 'Update Perubahan' : `Simpan ${activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'}`}
                             </button>
                         </div>
                     </div>

@@ -4,7 +4,7 @@ import {
     Save, Search, Phone, User, Eye, Edit, Trash2, BookOpen, 
     Activity, CheckCircle, MoreVertical, Filter, GraduationCap, 
     MapPin, Briefcase, Calendar, ChevronDown, Trophy, AlertTriangle, 
-    Gavel, AlertOctagon, UserCheck, ChevronUp
+    Gavel, AlertOctagon, UserCheck, ChevronUp, UserCog
 } from 'lucide-react';
 import { formatIndoDate, parseImportDate } from '../utils/helpers';
 import { RISK_LEVELS } from '../utils/constants';
@@ -15,14 +15,16 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
     const [showForm, setShowForm] = useState(false);
     const [viewDetail, setViewDetail] = useState(null); 
     const [showMobileMenu, setShowMobileMenu] = useState(false); 
-    const [expandBio, setExpandBio] = useState(false); // State untuk toggle biodata
+    const [expandBio, setExpandBio] = useState(false); 
 
-    // State Data Form
+    // State Data Form (UPDATED: Tambah Wali Kelas & Guru Wali)
     const [formData, setFormData] = useState({ 
         nisn: '', name: '', class: '', gender: 'L', 
         pob: '', dob: '', address: '', phone: '',
         parent: '', parentPhone: '', jobParent: '',
-        career: '', riskLevel: 'LOW' 
+        career: '', riskLevel: 'LOW',
+        homeroomTeacher: '', // Wali Kelas
+        guardianTeacher: ''  // Guru Wali
     });
     const [editingId, setEditingId] = useState(null);
     const fileInputRef = useRef(null);
@@ -48,7 +50,6 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
         return { violationTotal, achievementTotal, netScore, activeSanction, logs };
     };
 
-    // --- LOGIC HELPERS ---
     const getStudentHistory = (studentId) => {
         return journals.filter(j => 
             j.studentId === studentId || 
@@ -68,7 +69,9 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
             nisn: '', name: '', class: '', gender: 'L', 
             pob: '', dob: '', address: '', phone: '',
             parent: '', parentPhone: '', jobParent: '',
-            career: '', riskLevel: 'LOW' 
+            career: '', riskLevel: 'LOW',
+            homeroomTeacher: '', 
+            guardianTeacher: '' 
         });
         setEditingId(null);
         setShowForm(false);
@@ -82,19 +85,21 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // --- CSV TEMPLATE (UPDATED) ---
     const handleDownloadTemplate = () => {
-        const headers = "NISN,Nama Lengkap,Kelas,L/P,Tempat Lahir,Tanggal Lahir (DD-MM-YYYY),Alamat,No HP Siswa,Nama Wali,No HP Wali,Pekerjaan Wali,Resiko (LOW/MEDIUM/HIGH)";
-        const example = "12345678,Budi Santoso,X-1,L,Jakarta,06-08-2008,Jl. Merdeka No 1,08123456789,Bpk. Santoso,08198765432,Wiraswasta,LOW";
+        const headers = "NISN,Nama Lengkap,Kelas,L/P,Tempat Lahir,Tanggal Lahir (DD-MM-YYYY),Alamat,No HP Siswa,Nama Wali,No HP Wali,Pekerjaan Wali,Resiko (LOW/MEDIUM/HIGH),Wali Kelas,Guru Wali";
+        const example = "12345678,Budi Santoso,X-1,L,Jakarta,06-08-2008,Jl. Merdeka No 1,08123456789,Bpk. Santoso,08198765432,Wiraswasta,LOW,Ibu Guru A,Bpk Guru B";
         const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "template_siswa_sibko.csv");
+        link.setAttribute("download", "template_siswa_sibko_v2.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
+    // --- CSV IMPORT (UPDATED) ---
     const handleImportFile = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -124,6 +129,8 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                         parentPhone: cols[9]?.trim() || '',
                         jobParent: cols[10]?.trim() || '',
                         riskLevel: ['LOW', 'MEDIUM', 'HIGH'].includes(cols[11]?.trim()) ? cols[11]?.trim() : 'LOW',
+                        homeroomTeacher: cols[12]?.trim() || '', // Kolom Wali Kelas
+                        guardianTeacher: cols[13]?.trim() || ''   // Kolom Guru Wali
                     });
                 }
             });
@@ -273,6 +280,12 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                     <InputGroup label="Kelas" value={formData.class} onChange={e=>setFormData({...formData, class: e.target.value})} required placeholder="X-1"/>
                                 </div>
                             </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <InputGroup label="Wali Kelas" value={formData.homeroomTeacher} onChange={e=>setFormData({...formData, homeroomTeacher: e.target.value})} placeholder="Nama Wali Kelas"/>
+                                <InputGroup label="Guru Wali / Pendamping" value={formData.guardianTeacher} onChange={e=>setFormData({...formData, guardianTeacher: e.target.value})} placeholder="Nama Guru Wali"/>
+                            </div>
+
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Jenis Kelamin</label>
@@ -381,7 +394,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                     </th>
                                 )}
                                 <th className="p-4">Identitas Siswa</th>
-                                <th className="p-4">L/P</th>
+                                <th className="p-4">Pendamping</th>
                                 <th className="p-4">Kontak</th>
                                 <th className="p-4">Status Resiko</th>
                                 <th className="p-4 text-center">Aksi</th>
@@ -400,9 +413,15 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                         <div className="text-xs text-slate-500 mt-0.5 flex gap-2">
                                             <span className="bg-slate-200 px-1.5 rounded font-mono text-slate-700 font-bold">{s.class}</span>
                                             <span>{s.nisn || '-'}</span>
+                                            <span className="bg-slate-100 px-1.5 rounded font-bold">{s.gender}</span>
                                         </div>
                                     </td>
-                                    <td className="p-4 font-medium text-slate-600">{s.gender}</td>
+                                    <td className="p-4">
+                                        <div className="text-xs text-slate-600 flex flex-col gap-1">
+                                            <span title="Wali Kelas" className="flex items-center gap-1"><UserCog size={12} className="text-blue-500"/> {s.homeroomTeacher || '-'}</span>
+                                            <span title="Guru Wali" className="flex items-center gap-1"><Users size={12} className="text-green-500"/> {s.guardianTeacher || '-'}</span>
+                                        </div>
+                                    </td>
                                     <td className="p-4">
                                         {s.phone && <div className="flex items-center gap-1.5 text-xs text-slate-600 mb-1"><Phone size={12}/> {s.phone}</div>}
                                         {s.parent && <div className="flex items-center gap-1.5 text-xs text-slate-600"><User size={12}/> {s.parent}</div>}
@@ -451,6 +470,10 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                 const { violationTotal, achievementTotal, netScore, activeSanction, logs } = getStudentPointStatus(viewDetail.id);
                                 const history = getStudentHistory(viewDetail.id);
 
+                                // LOGIKA WARNA BARU (Tanpa Minus)
+                                const isDeficit = netScore > 0; // Violation > Achievement
+                                const isSurplus = netScore < 0; // Achievement > Violation
+
                                 return (
                                     <>
                                         {/* 1. STICKY HEADER SISWA */}
@@ -483,7 +506,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                                     </div>
                                                     <div className="text-center bg-white/10 px-4 py-2 rounded-lg">
                                                         <span className="block text-xs font-bold opacity-70">Total Poin</span>
-                                                        <span className="block text-2xl font-bold">{netScore}</span>
+                                                        <span className="block text-2xl font-bold">{Math.abs(netScore)}</span>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -508,10 +531,14 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                                     <p className="text-[10px] md:text-xs text-green-600 font-bold uppercase mb-1">Prestasi</p>
                                                     <p className="text-xl md:text-2xl font-bold text-slate-800">{achievementTotal}</p>
                                                 </div>
+                                                
+                                                {/* CARD POIN BERSIH (UPDATED) */}
                                                 <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center relative overflow-hidden">
-                                                    <div className={`absolute top-0 left-0 w-1 h-full ${netScore > 0 ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                                                    <div className={`absolute top-0 left-0 w-1 h-full ${isDeficit ? 'bg-red-500' : isSurplus ? 'bg-green-500' : 'bg-slate-300'}`}></div>
                                                     <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase mb-1">Poin Bersih</p>
-                                                    <p className={`text-xl md:text-2xl font-bold ${netScore > 0 ? 'text-orange-600' : 'text-green-600'}`}>{netScore}</p>
+                                                    <p className={`text-xl md:text-2xl font-bold ${isDeficit ? 'text-red-600' : isSurplus ? 'text-green-600' : 'text-slate-800'}`}>
+                                                        {Math.abs(netScore)}
+                                                    </p>
                                                 </div>
                                             </div>
 
@@ -590,11 +617,13 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                                                 <div className="flex justify-between"><span className="text-slate-500">No HP</span> <span className="font-medium">{viewDetail.phone || '-'}</span></div>
                                                             </div>
                                                             <div className="space-y-3">
-                                                                <h5 className="font-bold text-xs text-slate-400 uppercase border-b pb-1 mb-2">Data Wali</h5>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Nama Wali</span> <span className="font-medium">{viewDetail.parent || '-'}</span></div>
+                                                                <h5 className="font-bold text-xs text-slate-400 uppercase border-b pb-1 mb-2">Data Akademik & Wali</h5>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Wali Kelas</span> <span className="font-medium">{viewDetail.homeroomTeacher || '-'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Guru Wali</span> <span className="font-medium">{viewDetail.guardianTeacher || '-'}</span></div>
+                                                                <div className="flex justify-between"><span className="text-slate-500">Nama Ortu</span> <span className="font-medium">{viewDetail.parent || '-'}</span></div>
                                                                 <div className="flex justify-between"><span className="text-slate-500">Pekerjaan</span> <span className="font-medium">{viewDetail.jobParent || '-'}</span></div>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Kontak Wali</span> <span className="font-medium text-blue-600">{viewDetail.parentPhone || '-'}</span></div>
-                                                                <div className="flex justify-between mt-4 bg-yellow-50 p-2 rounded">
+                                                                <div className="flex justify-between"><span className="text-slate-500">Kontak Ortu</span> <span className="font-medium text-blue-600">{viewDetail.parentPhone || '-'}</span></div>
+                                                                <div className="flex justify-between mt-2 bg-yellow-50 p-2 rounded">
                                                                     <span className="text-slate-500 font-bold">Resiko Awal</span> 
                                                                     <span className={`font-bold ${RISK_LEVELS[viewDetail.riskLevel].badge} px-2 rounded`}>{RISK_LEVELS[viewDetail.riskLevel].label}</span>
                                                                 </div>
