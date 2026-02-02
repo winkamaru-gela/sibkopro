@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Shield, Edit, Trash2, PlusCircle } from 'lucide-react';
+import { Shield, Edit, Trash2, PlusCircle, Building2, Crown } from 'lucide-react'; 
 import { addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { getCollectionRef } from '../config/firebase';
 import { COLLECTION_PATHS, ACCESS_OPTIONS } from '../utils/constants';
 import { generateCredentials, calculateExpiry, formatIndoDate } from '../utils/helpers';
 
 const AdminUserManagement = ({ users }) => {
-    const [form, setForm] = useState({ username: '', password: '', fullName: '', duration: 30 });
+    // Tambah isSchoolAdmin di state form
+    const [form, setForm] = useState({ username: '', password: '', fullName: '', duration: 30, schoolId: '', isSchoolAdmin: false });
     const [editingId, setEditingId] = useState(null);
     
     const handleNameChange = (val) => {
@@ -21,13 +22,15 @@ const AdminUserManagement = ({ users }) => {
 
     const handleSaveUser = async (e) => {
         e.preventDefault();
-        if(!form.username || !form.password || !form.fullName) return alert("Lengkapi data!");
+        if(!form.username || !form.password || !form.fullName || !form.schoolId) return alert("Lengkapi data termasuk ID Sekolah!");
         
         const expiryDate = calculateExpiry(form.duration);
         const userData = {
             fullName: form.fullName,
             username: form.username,
             password: form.password,
+            schoolId: form.schoolId.toUpperCase().replace(/\s+/g, '_'),
+            isSchoolAdmin: form.isSchoolAdmin, // Simpan status Koordinator
             accessExpiry: expiryDate,
             role: 'guru',
             updatedAt: new Date().toISOString()
@@ -39,18 +42,11 @@ const AdminUserManagement = ({ users }) => {
                 alert("Data guru berhasil diperbarui.");
             } else {
                 if(users.some(u => u.username === form.username)) return alert("Username sudah digunakan!");
-                
-                await addDoc(getCollectionRef(COLLECTION_PATHS.users), {
-                    ...userData,
-                    createdAt: new Date().toISOString()
-                });
+                await addDoc(getCollectionRef(COLLECTION_PATHS.users), { ...userData, createdAt: new Date().toISOString() });
                 alert("Guru BK berhasil ditambahkan.");
             }
             resetForm();
-        } catch (error) {
-            console.error(error);
-            alert("Gagal menyimpan data.");
-        }
+        } catch (error) { alert("Gagal menyimpan."); }
     };
 
     const handleEdit = (user) => {
@@ -59,18 +55,20 @@ const AdminUserManagement = ({ users }) => {
             fullName: user.fullName,
             username: user.username,
             password: user.password,
+            schoolId: user.schoolId || '',
+            isSchoolAdmin: !!user.isSchoolAdmin, // Load status koordinator
             duration: user.accessExpiry ? 30 : -1 
         });
     };
 
     const handleDelete = async (id) => {
-        if(confirm("Yakin hapus akun ini? Guru tidak akan bisa login lagi.")) {
+        if(confirm("Yakin hapus akun ini?")) {
             await deleteDoc(doc(getCollectionRef(COLLECTION_PATHS.users), id));
         }
     };
 
     const resetForm = () => {
-        setForm({ username: '', password: '', fullName: '', duration: 30 });
+        setForm({ username: '', password: '', fullName: '', duration: 30, schoolId: '', isSchoolAdmin: false });
         setEditingId(null);
     };
 
@@ -79,66 +77,82 @@ const AdminUserManagement = ({ users }) => {
         const now = new Date();
         const exp = new Date(expiry);
         const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
-        
         if (diffDays < 0) return { label: 'Expired', color: 'bg-red-100 text-red-700' };
-        if (diffDays < 7) return { label: `${diffDays} Hari Lagi`, color: 'bg-orange-100 text-orange-700' };
         return { label: `Aktif (${diffDays} hari)`, color: 'bg-blue-100 text-blue-700' };
     };
 
     return (
         <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Shield size={24}/> Manajemen Pengguna (Guru BK)</h2>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Shield size={24}/> Manajemen Pengguna</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
-                    <div className="flex justify-between items-center border-b pb-2 mb-4">
-                        <h3 className="font-bold text-blue-600">{editingId ? 'Edit Data Guru' : 'Tambah Guru Baru'}</h3>
-                        {editingId && <button onClick={resetForm} className="text-xs text-red-500 hover:underline">Batal</button>}
-                    </div>
-                    
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit border-t-4 border-t-blue-600">
+                    <h3 className="font-bold text-slate-800 mb-4">{editingId ? 'Edit Data Guru' : 'Tambah Guru Baru'}</h3>
                     <form onSubmit={handleSaveUser} className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">Nama Lengkap Guru</label>
-                            <input className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" value={form.fullName} onChange={(e) => handleNameChange(e.target.value)} placeholder="Misal: Budi Santoso, S.Pd" required />
+                            <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={form.fullName} onChange={(e) => handleNameChange(e.target.value)} placeholder="Nama Guru BK" required />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">ID Sekolah (Kelompok)</label>
+                            <div className="relative">
+                                <Building2 className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                                <input className="w-full pl-10 p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold bg-slate-50" value={form.schoolId} onChange={e => setForm({...form, schoolId: e.target.value})} placeholder="Contoh: SMAN1_MDO" required />
+                            </div>
+                        </div>
+
+                        {/* CHECKBOX KOORDINATOR */}
+                        <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="w-5 h-5 accent-yellow-600 rounded"
+                                    checked={form.isSchoolAdmin}
+                                    onChange={e => setForm({...form, isSchoolAdmin: e.target.checked})}
+                                />
+                                <div>
+                                    <span className="text-sm font-bold text-slate-800 flex items-center gap-1"><Crown size={14} className="text-yellow-600"/> Koordinator Sekolah</span>
+                                    <p className="text-[10px] text-slate-500">Guru ini berhak mengedit Kop Surat & Master Poin Sekolah.</p>
+                                </div>
+                            </label>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Username (Auto)</label>
-                                <input className="w-full p-2 border rounded bg-slate-100 font-mono text-sm" value={form.username} onChange={e=>setForm({...form, username: e.target.value})} placeholder="Username" />
+                                <label className="block text-xs font-bold text-slate-500 mb-1">Username</label>
+                                <input className="w-full p-2.5 border rounded-lg bg-slate-50 font-mono text-sm" value={form.username} onChange={e=>setForm({...form, username: e.target.value})} />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Password (Auto)</label>
-                                <input className="w-full p-2 border rounded bg-slate-100 font-mono text-sm" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Password" />
+                                <label className="block text-xs font-bold text-slate-500 mb-1">Password</label>
+                                <input className="w-full p-2.5 border rounded-lg bg-slate-50 font-mono text-sm" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Masa Aktif Akun</label>
-                            <select className="w-full p-2 border rounded bg-white" value={form.duration} onChange={e=>setForm({...form, duration: e.target.value})}>
-                                {ACCESS_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Masa Aktif</label>
+                            <select className="w-full p-2.5 border rounded-lg bg-white text-sm" value={form.duration} onChange={e=>setForm({...form, duration: e.target.value})}>
+                                {ACCESS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
-                            <p className="text-[10px] text-slate-400 mt-1">*Pilih "Selamanya" untuk akses tanpa batas.</p>
                         </div>
 
-                        <button className={`w-full text-white py-2 rounded font-bold flex justify-center items-center gap-2 ${editingId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                        <button className={`w-full text-white py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${editingId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'}`}>
                             {editingId ? <><Edit size={18}/> Update Akun</> : <><PlusCircle size={18}/> Buat Akun</>}
                         </button>
                     </form>
                 </div>
 
+                {/* TABLE */}
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="p-4 bg-slate-50 border-b font-bold text-slate-700">Daftar Guru BK Aktif</div>
+                    <div className="p-4 bg-slate-50 border-b font-bold text-slate-700 uppercase text-xs tracking-wider">Daftar Guru BK Aktif</div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-100 text-slate-500">
+                            <thead className="bg-slate-100 text-slate-500 font-bold uppercase text-[10px]">
                                 <tr>
-                                    <th className="p-3">Nama Lengkap</th>
-                                    <th className="p-3">Akun Login</th>
-                                    <th className="p-3">Status Akses</th>
-                                    <th className="p-3 text-center">Aksi</th>
+                                    <th className="p-4">Nama & Sekolah</th>
+                                    <th className="p-4">Akun Login</th>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4 text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -146,33 +160,25 @@ const AdminUserManagement = ({ users }) => {
                                     const status = getStatus(u.accessExpiry);
                                     return (
                                         <tr key={u.id} className="hover:bg-slate-50">
-                                            <td className="p-3 font-bold text-slate-700">{u.fullName}</td>
-                                            <td className="p-3 text-slate-500 font-mono text-xs">
-                                                User: {u.username}<br/>
-                                                Pass: {u.password}
+                                            <td className="p-4">
+                                                <div className="font-bold text-slate-700 flex items-center gap-1">
+                                                    {u.fullName} {u.isSchoolAdmin && <Crown size={14} className="text-yellow-500" title="Koordinator"/>}
+                                                </div>
+                                                <div className="text-[10px] font-black text-blue-600 bg-blue-50 inline-block px-2 py-0.5 rounded mt-1 border border-blue-100">{u.schoolId || 'BELUM DISET'}</div>
                                             </td>
-                                            <td className="p-3">
-                                                <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${status.color}`}>
-                                                    {status.label}
-                                                </span>
-                                                {u.accessExpiry && <div className="text-[10px] text-slate-400 mt-1">Exp: {formatIndoDate(u.accessExpiry)}</div>}
+                                            <td className="p-4 font-mono text-xs text-slate-500">U: {u.username}<br/>P: {u.password}</td>
+                                            <td className="p-4">
+                                                <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${status.color}`}>{status.label}</span>
                                             </td>
-                                            <td className="p-3 text-center">
+                                            <td className="p-4 text-center">
                                                 <div className="flex justify-center gap-1">
-                                                    <button onClick={() => handleEdit(u)} className="text-blue-500 hover:bg-blue-50 p-2 rounded" title="Edit / Perpanjang">
-                                                        <Edit size={16}/>
-                                                    </button>
-                                                    <button onClick={() => handleDelete(u.id)} className="text-red-500 hover:bg-red-50 p-2 rounded" title="Hapus Akses">
-                                                        <Trash2 size={16}/>
-                                                    </button>
+                                                    <button onClick={() => handleEdit(u)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><Edit size={16}/></button>
+                                                    <button onClick={() => handleDelete(u.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
                                                 </div>
                                             </td>
                                         </tr>
                                     );
                                 })}
-                                {users.filter(u => u.role === 'guru').length === 0 && (
-                                    <tr><td colSpan="4" className="p-6 text-center text-slate-400 italic">Belum ada data guru BK.</td></tr>
-                                )}
                             </tbody>
                         </table>
                     </div>
