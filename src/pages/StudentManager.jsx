@@ -1,11 +1,12 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { 
     Users, X, ArrowRightLeft, FileSpreadsheet, Upload, PlusCircle, 
     Save, Search, Phone, User, Eye, Edit, Trash2, BookOpen, 
     Activity, CheckCircle, MoreVertical, Filter, GraduationCap, 
     MapPin, Briefcase, Calendar, ChevronDown, Trophy, AlertTriangle, 
-    Gavel, AlertOctagon, UserCheck, ChevronUp, UserCog
+    Gavel, AlertOctagon, UserCheck, ChevronUp, UserCog, UserMinus
 } from 'lucide-react';
+import * as XLSX from 'xlsx'; // Import Library Excel
 import { formatIndoDate, parseImportDate } from '../utils/helpers';
 import { RISK_LEVELS } from '../utils/constants';
 
@@ -17,15 +18,24 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
     const [showMobileMenu, setShowMobileMenu] = useState(false); 
     const [expandBio, setExpandBio] = useState(false); 
 
-    // State Data Form (UPDATED: Tambah Wali Kelas & Guru Wali)
+    // State Data Form (UPDATED: Tambah Detail Ayah & Ibu)
     const [formData, setFormData] = useState({ 
         nisn: '', name: '', class: '', gender: 'L', 
         pob: '', dob: '', address: '', phone: '',
-        parent: '', parentPhone: '', jobParent: '',
+        
+        // Data Ayah
+        fatherName: '', fatherJob: '', fatherPhone: '', fatherDeceased: false,
+        // Data Ibu
+        motherName: '', motherJob: '', motherPhone: '', motherDeceased: false,
+        
+        // Wali Utama (Auto-fill / Manual)
+        parent: '', parentPhone: '', jobParent: '', // Ini yang tampil di laporan/kop
+        
         career: '', riskLevel: 'LOW',
-        homeroomTeacher: '', // Wali Kelas
-        guardianTeacher: ''  // Guru Wali
+        homeroomTeacher: '', 
+        guardianTeacher: ''  
     });
+
     const [editingId, setEditingId] = useState(null);
     const fileInputRef = useRef(null);
 
@@ -33,6 +43,36 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
     const [isMoveMode, setIsMoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [targetClass, setTargetClass] = useState('');
+
+    // --- LOGIC: AUTO-FILL WALI ---
+    // Efek samping: Setiap kali data Ayah/Ibu berubah, update Wali Utama
+    useEffect(() => {
+        // Logika Prioritas: Ayah Hidup -> Ibu Hidup -> Biarkan Manual
+        // Kita hanya update otomatis jika field Wali masih kosong ATAU sinkron dengan input sebelumnya
+        
+        // 1. Cek apakah Ayah Calon Wali? (Ada nama & tidak meninggal)
+        if (formData.fatherName && !formData.fatherDeceased) {
+            setFormData(prev => ({
+                ...prev,
+                parent: prev.fatherName,
+                jobParent: prev.fatherJob,
+                parentPhone: prev.fatherPhone
+            }));
+        } 
+        // 2. Jika tidak, Cek Ibu? (Ada nama & tidak meninggal)
+        else if (formData.motherName && !formData.motherDeceased) {
+            setFormData(prev => ({
+                ...prev,
+                parent: prev.motherName,
+                jobParent: prev.motherJob,
+                parentPhone: prev.motherPhone
+            }));
+        }
+        // Jika keduanya meninggal/kosong, biarkan field Wali apa adanya (untuk input manual Paman/Kakek dll)
+    }, [
+        formData.fatherName, formData.fatherJob, formData.fatherPhone, formData.fatherDeceased,
+        formData.motherName, formData.motherJob, formData.motherPhone, formData.motherDeceased
+    ]);
 
     const filteredStudents = students.filter(s => 
         s.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -68,10 +108,11 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
         setFormData({ 
             nisn: '', name: '', class: '', gender: 'L', 
             pob: '', dob: '', address: '', phone: '',
+            fatherName: '', fatherJob: '', fatherPhone: '', fatherDeceased: false,
+            motherName: '', motherJob: '', motherPhone: '', motherDeceased: false,
             parent: '', parentPhone: '', jobParent: '',
             career: '', riskLevel: 'LOW',
-            homeroomTeacher: '', 
-            guardianTeacher: '' 
+            homeroomTeacher: '', guardianTeacher: '' 
         });
         setEditingId(null);
         setShowForm(false);
@@ -80,70 +121,165 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
 
     const handleEditClick = (student) => {
         setEditingId(student.id);
-        setFormData({ ...formData, ...student });
+        // Pastikan boolean deceased terhandle dengan benar jika data lama tidak punya field ini
+        setFormData({ 
+            ...formData, 
+            ...student,
+            fatherDeceased: !!student.fatherDeceased,
+            motherDeceased: !!student.motherDeceased
+        });
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // --- CSV TEMPLATE (UPDATED) ---
+    // --- 1. DOWNLOAD TEMPLATE EXCEL (UPDATED) ---
     const handleDownloadTemplate = () => {
-        const headers = "NISN,Nama Lengkap,Kelas,L/P,Tempat Lahir,Tanggal Lahir (DD-MM-YYYY),Alamat,No HP Siswa,Nama Wali,No HP Wali,Pekerjaan Wali,Resiko (LOW/MEDIUM/HIGH),Wali Kelas,Guru Wali";
-        const example = "12345678,Budi Santoso,X-1,L,Jakarta,06-08-2008,Jl. Merdeka No 1,08123456789,Bpk. Santoso,08198765432,Wiraswasta,LOW,Ibu Guru A,Bpk Guru B";
-        const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "template_siswa_sibko_v2.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const templateData = [
+            {
+                "NISN": "12345678",
+                "Nama Lengkap": "Budi Santoso",
+                "Kelas": "X-1",
+                "L/P": "L",
+                "Tempat Lahir": "Jakarta",
+                "Tanggal Lahir (DD-MM-YYYY)": "06-08-2008",
+                "Alamat": "Jl. Merdeka No 1",
+                "No HP Siswa": "08123456789",
+                
+                // DATA AYAH
+                "Nama Ayah": "Bpk. Santoso",
+                "Pekerjaan Ayah": "Wiraswasta",
+                "No HP Ayah": "0811...",
+                "Status Ayah (Hidup/Meninggal)": "Hidup",
+                
+                // DATA IBU
+                "Nama Ibu": "Ibu Siti",
+                "Pekerjaan Ibu": "IRT",
+                "No HP Ibu": "0812...",
+                "Status Ibu (Hidup/Meninggal)": "Hidup",
+
+                // DATA WALI UTAMA (Jika beda dari ayah/ibu)
+                "Nama Wali (Opsional)": "",
+                "Pekerjaan Wali (Opsional)": "",
+                "No HP Wali (Opsional)": "",
+
+                "Resiko (LOW/MEDIUM/HIGH)": "LOW",
+                "Wali Kelas": "Ibu Guru A",
+                "Guru Wali": "Bpk Guru B"
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Template Siswa");
+        
+        // Auto width (sekadarnya)
+        const wscols = Array(20).fill({wch:20});
+        ws['!cols'] = wscols;
+
+        XLSX.writeFile(wb, "Template_Data_Siswa_Lengkap.xlsx");
     };
 
-    // --- CSV IMPORT (UPDATED) ---
+    // --- 2. IMPORT EXCEL FILE (UPDATED) ---
     const handleImportFile = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
         const reader = new FileReader();
         reader.onload = (evt) => {
-            const text = evt.target.result;
-            const rows = text.split('\n').slice(1); 
-            const newStudents = [];
-            
-            rows.forEach(row => {
-                const cols = row.split(',');
-                if (cols.length >= 2 && cols[1].trim() !== '') { 
-                    const rawDob = cols[5]?.trim() || '';
-                    const parsedDob = parseImportDate(rawDob);
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const jsonData = XLSX.utils.sheet_to_json(ws); 
 
-                    newStudents.push({
-                        nisn: cols[0]?.trim() || '',
-                        name: cols[1]?.trim() || '',
-                        class: cols[2]?.trim() || '',
-                        gender: cols[3]?.trim().toUpperCase() === 'P' ? 'P' : 'L',
-                        pob: cols[4]?.trim() || '',
-                        dob: parsedDob, 
-                        address: cols[6]?.trim() || '',
-                        phone: cols[7]?.trim() || '',
-                        parent: cols[8]?.trim() || '',
-                        parentPhone: cols[9]?.trim() || '',
-                        jobParent: cols[10]?.trim() || '',
-                        riskLevel: ['LOW', 'MEDIUM', 'HIGH'].includes(cols[11]?.trim()) ? cols[11]?.trim() : 'LOW',
-                        homeroomTeacher: cols[12]?.trim() || '', // Kolom Wali Kelas
-                        guardianTeacher: cols[13]?.trim() || ''   // Kolom Guru Wali
-                    });
-                }
-            });
+                const newStudents = [];
+                
+                jsonData.forEach((row) => {
+                    if (row["Nama Lengkap"]) {
+                        const getVal = (key) => (row[key] ? String(row[key]).trim() : '');
+                        
+                        // Parse Tanggal
+                        let parsedDob = '';
+                        if (row["Tanggal Lahir (DD-MM-YYYY)"]) {
+                            const rawDob = row["Tanggal Lahir (DD-MM-YYYY)"];
+                            if (typeof rawDob === 'number') {
+                                const dateObj = new Date(Math.round((rawDob - 25569)*86400*1000));
+                                parsedDob = dateObj.toISOString().slice(0,10); 
+                            } else {
+                                parsedDob = parseImportDate(String(rawDob));
+                            }
+                        }
 
-            if (newStudents.length > 0) {
-                if(confirm(`Ditemukan ${newStudents.length} data siswa. Yakin ingin import?`)) {
-                    onImport(newStudents);
+                        // Logic Status Meninggal
+                        const fatherDead = getVal("Status Ayah (Hidup/Meninggal)").toLowerCase().includes('meninggal');
+                        const motherDead = getVal("Status Ibu (Hidup/Meninggal)").toLowerCase().includes('meninggal');
+
+                        // Logic Auto-Fill Wali saat Import
+                        let finalParent = getVal("Nama Wali (Opsional)");
+                        let finalJob = getVal("Pekerjaan Wali (Opsional)");
+                        let finalPhone = getVal("No HP Wali (Opsional)");
+
+                        // Jika Wali kosong, ambil dari Ayah, lalu Ibu
+                        if (!finalParent) {
+                            if (getVal("Nama Ayah") && !fatherDead) {
+                                finalParent = getVal("Nama Ayah");
+                                finalJob = getVal("Pekerjaan Ayah");
+                                finalPhone = getVal("No HP Ayah");
+                            } else if (getVal("Nama Ibu") && !motherDead) {
+                                finalParent = getVal("Nama Ibu");
+                                finalJob = getVal("Pekerjaan Ibu");
+                                finalPhone = getVal("No HP Ibu");
+                            }
+                        }
+
+                        newStudents.push({
+                            nisn: getVal("NISN"),
+                            name: getVal("Nama Lengkap"),
+                            class: getVal("Kelas"),
+                            gender: getVal("L/P").toUpperCase() === 'P' ? 'P' : 'L',
+                            pob: getVal("Tempat Lahir"),
+                            dob: parsedDob, 
+                            address: getVal("Alamat"),
+                            phone: getVal("No HP Siswa"),
+                            
+                            // Ayah
+                            fatherName: getVal("Nama Ayah"),
+                            fatherJob: getVal("Pekerjaan Ayah"),
+                            fatherPhone: getVal("No HP Ayah"),
+                            fatherDeceased: fatherDead,
+
+                            // Ibu
+                            motherName: getVal("Nama Ibu"),
+                            motherJob: getVal("Pekerjaan Ibu"),
+                            motherPhone: getVal("No HP Ibu"),
+                            motherDeceased: motherDead,
+
+                            // Wali Utama (Hasil Logika)
+                            parent: finalParent,
+                            jobParent: finalJob,
+                            parentPhone: finalPhone,
+
+                            riskLevel: ['LOW', 'MEDIUM', 'HIGH'].includes(getVal("Resiko (LOW/MEDIUM/HIGH)")) ? getVal("Resiko (LOW/MEDIUM/HIGH)") : 'LOW',
+                            homeroomTeacher: getVal("Wali Kelas"),
+                            guardianTeacher: getVal("Guru Wali")
+                        });
+                    }
+                });
+
+                if (newStudents.length > 0) {
+                    if(confirm(`Ditemukan ${newStudents.length} data siswa dari Excel. Import sekarang?`)) {
+                        onImport(newStudents);
+                    }
+                } else {
+                    alert("Tidak ada data valid.");
                 }
-            } else {
-                alert("Tidak ada data valid yang ditemukan dalam file CSV.");
+            } catch (error) {
+                console.error(error);
+                alert("Gagal membaca file Excel.");
             }
         };
-        reader.readAsText(file);
+        reader.readAsBinaryString(file); 
         e.target.value = null; 
     };
 
@@ -224,7 +360,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                 <button onClick={handleDownloadTemplate} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
                                     <FileSpreadsheet size={18}/>
                                 </button>
-                                <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleImportFile} />
+                                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportFile} />
                                 <button onClick={() => fileInputRef.current.click()} className="bg-green-600 text-white hover:bg-green-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors">
                                     <Upload size={18}/>
                                 </button>
@@ -247,10 +383,10 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                         <ArrowRightLeft size={20}/> Pindah Kelas
                     </button>
                     <button onClick={handleDownloadTemplate} className="flex flex-col items-center gap-1 p-3 bg-slate-50 text-slate-700 rounded-lg text-xs font-bold border border-slate-200">
-                        <FileSpreadsheet size={20}/> Template CSV
+                        <FileSpreadsheet size={20}/> Template Excel
                     </button>
                     <button onClick={() => fileInputRef.current.click()} className="col-span-2 flex items-center justify-center gap-2 p-3 bg-green-50 text-green-700 rounded-lg text-xs font-bold border border-green-100">
-                        <Upload size={18}/> Import Data dari CSV
+                        <Upload size={18}/> Import Data dari Excel
                     </button>
                 </div>
             )}
@@ -268,7 +404,8 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                     </div>
                     
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Form Identitas */}
+                        
+                        {/* 1. IDENTITAS SISWA */}
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-2 border-b border-slate-200 pb-2">
                                 <User size={14}/> Identitas Siswa
@@ -301,15 +438,67 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                             <InputGroup label="Alamat Lengkap" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Jalan, Desa, Kecamatan..."/>
                         </div>
 
-                        {/* Form Ortu */}
+                        {/* 2. DATA KELUARGA (AYAH & IBU) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* DATA AYAH */}
+                            <div className={`p-4 rounded-xl border space-y-4 transition-colors ${formData.fatherDeceased ? 'bg-red-50 border-red-200' : 'bg-blue-50/50 border-blue-100'}`}>
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                        <User size={14}/> Data Ayah
+                                    </h4>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 accent-red-600 rounded"
+                                            checked={formData.fatherDeceased}
+                                            onChange={e => setFormData({...formData, fatherDeceased: e.target.checked})}
+                                        />
+                                        <span className="text-[10px] font-bold text-red-600">Meninggal Dunia</span>
+                                    </label>
+                                </div>
+                                <InputGroup label="Nama Ayah" value={formData.fatherName} onChange={e=>setFormData({...formData, fatherName: e.target.value})} disabled={formData.fatherDeceased} />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <InputGroup label="Pekerjaan" value={formData.fatherJob} onChange={e=>setFormData({...formData, fatherJob: e.target.value})} disabled={formData.fatherDeceased} />
+                                    <InputGroup label="No HP" value={formData.fatherPhone} onChange={e=>setFormData({...formData, fatherPhone: e.target.value})} disabled={formData.fatherDeceased} />
+                                </div>
+                            </div>
+
+                            {/* DATA IBU */}
+                            <div className={`p-4 rounded-xl border space-y-4 transition-colors ${formData.motherDeceased ? 'bg-red-50 border-red-200' : 'bg-pink-50/50 border-pink-100'}`}>
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                        <User size={14}/> Data Ibu
+                                    </h4>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 accent-red-600 rounded"
+                                            checked={formData.motherDeceased}
+                                            onChange={e => setFormData({...formData, motherDeceased: e.target.checked})}
+                                        />
+                                        <span className="text-[10px] font-bold text-red-600">Meninggal Dunia</span>
+                                    </label>
+                                </div>
+                                <InputGroup label="Nama Ibu" value={formData.motherName} onChange={e=>setFormData({...formData, motherName: e.target.value})} disabled={formData.motherDeceased} />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <InputGroup label="Pekerjaan" value={formData.motherJob} onChange={e=>setFormData({...formData, motherJob: e.target.value})} disabled={formData.motherDeceased} />
+                                    <InputGroup label="No HP" value={formData.motherPhone} onChange={e=>setFormData({...formData, motherPhone: e.target.value})} disabled={formData.motherDeceased} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. WALI UTAMA (AUTO FILL / MANUAL) */}
                         <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100 space-y-4">
                             <h4 className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-2 mb-2 border-b border-purple-200 pb-2">
-                                <Users size={14}/> Orang Tua / Wali
+                                <Users size={14}/> Wali Utama (Untuk Laporan & Kontak)
                             </h4>
+                            <p className="text-[10px] text-slate-400 italic">
+                                *Otomatis terisi dari Ayah/Ibu yang masih hidup, namun bisa diubah manual jika Wali adalah Paman/Kakek/Lainnya.
+                            </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <InputGroup label="Nama Ortu/Wali" value={formData.parent} onChange={e=>setFormData({...formData, parent: e.target.value})} />
+                                <InputGroup label="Nama Wali" value={formData.parent} onChange={e=>setFormData({...formData, parent: e.target.value})} />
                                 <InputGroup label="Pekerjaan" value={formData.jobParent} onChange={e=>setFormData({...formData, jobParent: e.target.value})} />
-                                <InputGroup label="No HP Ortu" value={formData.parentPhone} onChange={e=>setFormData({...formData, parentPhone: e.target.value})} />
+                                <InputGroup label="No HP Wali" value={formData.parentPhone} onChange={e=>setFormData({...formData, parentPhone: e.target.value})} />
                             </div>
                         </div>
 
@@ -616,16 +805,29 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
                                                                 <div className="flex justify-between"><span className="text-slate-500">Alamat</span> <span className="font-medium text-right max-w-[200px]">{viewDetail.address || '-'}</span></div>
                                                                 <div className="flex justify-between"><span className="text-slate-500">No HP</span> <span className="font-medium">{viewDetail.phone || '-'}</span></div>
                                                             </div>
+                                                            
+                                                            {/* DETAIL ORTU DI VIEW MODE */}
                                                             <div className="space-y-3">
-                                                                <h5 className="font-bold text-xs text-slate-400 uppercase border-b pb-1 mb-2">Data Akademik & Wali</h5>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Wali Kelas</span> <span className="font-medium">{viewDetail.homeroomTeacher || '-'}</span></div>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Guru Wali</span> <span className="font-medium">{viewDetail.guardianTeacher || '-'}</span></div>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Nama Ortu</span> <span className="font-medium">{viewDetail.parent || '-'}</span></div>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Pekerjaan</span> <span className="font-medium">{viewDetail.jobParent || '-'}</span></div>
-                                                                <div className="flex justify-between"><span className="text-slate-500">Kontak Ortu</span> <span className="font-medium text-blue-600">{viewDetail.parentPhone || '-'}</span></div>
-                                                                <div className="flex justify-between mt-2 bg-yellow-50 p-2 rounded">
-                                                                    <span className="text-slate-500 font-bold">Resiko Awal</span> 
-                                                                    <span className={`font-bold ${RISK_LEVELS[viewDetail.riskLevel].badge} px-2 rounded`}>{RISK_LEVELS[viewDetail.riskLevel].label}</span>
+                                                                <h5 className="font-bold text-xs text-slate-400 uppercase border-b pb-1 mb-2">Data Keluarga</h5>
+                                                                
+                                                                <div className="bg-slate-50 p-2 rounded text-xs space-y-1">
+                                                                    <div className="font-bold text-slate-600">Ayah</div>
+                                                                    <div className="flex justify-between"><span>Nama:</span> <span className="font-medium">{viewDetail.fatherName || '-'} {viewDetail.fatherDeceased && '(Alm)'}</span></div>
+                                                                    <div className="flex justify-between"><span>Pekerjaan:</span> <span className="font-medium">{viewDetail.fatherJob || '-'}</span></div>
+                                                                    <div className="flex justify-between"><span>HP:</span> <span className="font-medium">{viewDetail.fatherPhone || '-'}</span></div>
+                                                                </div>
+
+                                                                <div className="bg-slate-50 p-2 rounded text-xs space-y-1">
+                                                                    <div className="font-bold text-slate-600">Ibu</div>
+                                                                    <div className="flex justify-between"><span>Nama:</span> <span className="font-medium">{viewDetail.motherName || '-'} {viewDetail.motherDeceased && '(Almh)'}</span></div>
+                                                                    <div className="flex justify-between"><span>Pekerjaan:</span> <span className="font-medium">{viewDetail.motherJob || '-'}</span></div>
+                                                                    <div className="flex justify-between"><span>HP:</span> <span className="font-medium">{viewDetail.motherPhone || '-'}</span></div>
+                                                                </div>
+
+                                                                <div className="bg-blue-50 p-2 rounded text-xs space-y-1 border border-blue-100">
+                                                                    <div className="font-bold text-blue-700">Wali Utama</div>
+                                                                    <div className="flex justify-between"><span>Nama:</span> <span className="font-bold">{viewDetail.parent || '-'}</span></div>
+                                                                    <div className="flex justify-between"><span>Hubungi:</span> <span className="font-bold text-blue-600">{viewDetail.parentPhone || '-'}</span></div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -652,16 +854,17 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, onAdd, o
 };
 
 // Sub-component untuk Input yang Rapi
-const InputGroup = ({ label, value, onChange, placeholder, required, type="text" }) => (
+const InputGroup = ({ label, value, onChange, placeholder, required, type="text", disabled }) => (
     <div>
         <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">{label}</label>
         <input 
             type={type}
-            className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300" 
+            className={`w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 ${disabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`} 
             value={value} 
             onChange={onChange} 
             placeholder={placeholder}
             required={required}
+            disabled={disabled}
         />
     </div>
 );
