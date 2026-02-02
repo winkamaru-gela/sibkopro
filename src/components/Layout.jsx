@@ -45,7 +45,7 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
             { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser },
 
             // 5. Menu Laporan
-            { id: 'reports', label: 'Laporan & Cetak', icon: Printer },
+            { id: 'reports', label: 'Cetak Laporan', icon: Printer },
 
             // 6. Master Data (Group) - Di bawah Laporan
             { 
