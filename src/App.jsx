@@ -48,7 +48,7 @@ export default function App() {
         return onAuthStateChanged(auth, u => setAuthUser(u));
     }, []);
 
-    // 2. Fetch Users (Wait for auth) -> KHUSUS ADMIN (Untuk Manajemen User)
+    // 2. Fetch Users (Wait for auth) -> KHUSUS ADMIN
     useEffect(() => {
         if (!authUser) return;
         const q = query(getCollectionRef(COLLECTION_PATHS.users));
@@ -63,66 +63,56 @@ export default function App() {
         return () => unsub();
     }, [authUser]);
 
-    // 3. Fetch Data (Only if logged in) -> KHUSUS GURU (Data Pribadi)
+    // 3. Fetch Data (Only if logged in) -> KHUSUS GURU
     useEffect(() => {
         if (!appUser || !authUser) return;
 
         // Jika Admin, tidak perlu load data siswa/jurnal/poin
         if (appUser.role === 'admin') return;
 
-        // A. Fetch Students (Hanya milik guru ini)
+        // Kunci Utama: schoolId (Jika admin belum set, pakai id guru sendiri sebagai default)
+        const sId = appUser.schoolId || appUser.id;
+
+        // A. Fetch Students (Hanya milik sekolah ini)
+        // Guru melihat siswa miliknya + siswa yang sedang pending transfer ke dia
         const unsubStudents = onSnapshot(getCollectionRef(COLLECTION_PATHS.students), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            // Filter ketat berdasarkan teacherId
-            data = data.filter(d => d.teacherId === appUser.id);
-            setStudents(data);
+            setStudents(data.filter(d => 
+                d.teacherId === appUser.id || 
+                (d.transferStatus === 'pending' && d.pendingTeacherId === appUser.id)
+            ));
         });
 
         // B. Fetch Journals (Hanya milik guru ini)
         const unsubJournals = onSnapshot(getCollectionRef(COLLECTION_PATHS.journals), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            // Filter ketat berdasarkan teacherId
-            data = data.filter(d => d.teacherId === appUser.id);
-            setJournals(data);
+            setJournals(data.filter(d => d.teacherId === appUser.id));
         });
 
-        // C. Fetch Settings (Identitas Sekolah - Milik Guru Ini)
+        // C. Fetch Settings (DATA SEKOLAH BERSAMA)
         const unsubSettings = onSnapshot(getCollectionRef(COLLECTION_PATHS.settings), snap => {
             const allSettings = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            const mySet = allSettings.find(s => s.userId === appUser.id);
-            if(mySet) setMySettings(mySet);
+            const schoolSet = allSettings.find(s => s.schoolId === sId);
+            if(schoolSet) setMySettings(schoolSet);
             else setMySettings({});
         });
 
-        // D. Fetch Point Logs (Catatan Poin - Milik Guru Ini)
+        // D. Fetch Point Logs
         const unsubPoints = onSnapshot(collection(db, 'point_logs'), snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            // Filter ketat berdasarkan teacherId
-            data = data.filter(d => d.teacherId === appUser.id);
-            setPointLogs(data);
+            setPointLogs(data.filter(d => d.teacherId === appUser.id));
         });
 
-        // E. Fetch Master Data Points (ISOLASI DATA: Dokumen Spesifik User)
-        // Nama dokumen sekarang: master_points_USERID
-        const masterPointsDocId = `master_points_${appUser.id}`;
-        const unsubMaster = onSnapshot(doc(db, 'settings', masterPointsDocId), (docSnap) => {
-            if (docSnap.exists()) {
-                setMasterPoints(docSnap.data().items || []);
-            } else {
-                // Jika belum ada data, set kosong (User harus input sendiri)
-                setMasterPoints([]);
-            }
+        // E. Fetch Master Data Points (Shared in School)
+        const unsubMaster = onSnapshot(doc(db, 'settings', `master_points_${sId}`), (docSnap) => {
+            if (docSnap.exists()) setMasterPoints(docSnap.data().items || []);
+            else setMasterPoints([]);
         });
 
-        // F. Fetch Sanction Rules (ISOLASI DATA: Dokumen Spesifik User)
-        // Nama dokumen sekarang: sanction_rules_USERID
-        const sanctionRulesDocId = `sanction_rules_${appUser.id}`;
-        const unsubSanctions = onSnapshot(doc(db, 'settings', sanctionRulesDocId), (docSnap) => {
-            if (docSnap.exists()) {
-                setSanctionRules(docSnap.data().items || []);
-            } else {
-                setSanctionRules([]);
-            }
+        // F. Fetch Sanction Rules (Shared in School)
+        const unsubSanctions = onSnapshot(doc(db, 'settings', `sanction_rules_${sId}`), (docSnap) => {
+            if (docSnap.exists()) setSanctionRules(docSnap.data().items || []);
+            else setSanctionRules([]);
         });
 
         return () => { 
@@ -142,7 +132,6 @@ export default function App() {
                     setLoginError('Masa aktif akun telah habis. Hubungi Admin.');
                 } else {
                     setAppUser(user);
-                    // Redirect Admin ke Dashboard Admin, Guru ke Dashboard Guru
                     if(user.role === 'admin') setActiveTab('dashboard');
                     else setActiveTab('dashboard');
                 }
@@ -175,9 +164,66 @@ export default function App() {
         } catch (e) { alert("Gagal update profil."); }
     }
 
+    // --- TRANSFER SISWA LOGIC ---
+    const requestTransfer = async (studentId, targetTeacherId) => {
+        try {
+            await updateDoc(doc(db, COLLECTION_PATHS.students, studentId), {
+                transferStatus: 'pending',
+                pendingTeacherId: targetTeacherId,
+                requestedBy: appUser.id,
+                requestedByName: appUser.fullName
+            });
+            alert("Permintaan transfer berhasil dikirim.");
+        } catch (e) { alert("Gagal kirim permintaan."); }
+    };
+
+    const approveTransfer = async (studentId) => {
+        try {
+            const batch = writeBatch(db);
+            const newTeacherId = appUser.id; // Penerima jadi pemilik baru
+
+            // Update Siswa
+            batch.update(doc(db, COLLECTION_PATHS.students, studentId), {
+                teacherId: newTeacherId,
+                transferStatus: null,
+                pendingTeacherId: null,
+                requestedBy: null,
+                requestedByName: null
+            });
+
+            // Update Jurnal & Poin
+            journals.filter(j => j.studentId === studentId).forEach(j => {
+                batch.update(doc(db, COLLECTION_PATHS.journals, j.id), { teacherId: newTeacherId });
+            });
+            pointLogs.filter(p => p.studentId === studentId).forEach(p => {
+                batch.update(doc(db, 'point_logs', p.id), { teacherId: newTeacherId });
+            });
+
+            await batch.commit();
+            alert("Transfer berhasil! Seluruh riwayat siswa kini milik Anda.");
+        } catch (e) { alert("Gagal menyetujui."); }
+    };
+
+    const rejectTransfer = async (studentId) => {
+        try {
+            await updateDoc(doc(db, COLLECTION_PATHS.students, studentId), {
+                transferStatus: null,
+                pendingTeacherId: null,
+                requestedBy: null,
+                requestedByName: null
+            });
+            alert("Permintaan transfer ditolak.");
+        } catch (e) { alert("Gagal menolak."); }
+    };
+
     // --- CRUD ACTIONS ---
     const addStudent = async (data) => {
-        await addDoc(getCollectionRef(COLLECTION_PATHS.students), { ...data, teacherId: appUser.id, createdAt: new Date().toISOString() });
+        await addDoc(getCollectionRef(COLLECTION_PATHS.students), { 
+            ...data, 
+            teacherId: appUser.id, 
+            schoolId: appUser.schoolId || appUser.id,
+            createdAt: new Date().toISOString() 
+        });
     };
     
     const importStudents = async (studentList) => {
@@ -185,7 +231,7 @@ export default function App() {
             const batch = writeBatch(db);
             studentList.forEach(student => {
                 const docRef = doc(collection(db, COLLECTION_PATHS.students));
-                batch.set(docRef, { ...student, teacherId: appUser.id, createdAt: new Date().toISOString() });
+                batch.set(docRef, { ...student, teacherId: appUser.id, schoolId: appUser.schoolId || appUser.id, createdAt: new Date().toISOString() });
             });
             await batch.commit();
             alert(`Berhasil mengimpor ${studentList.length} data siswa!`);
@@ -204,35 +250,15 @@ export default function App() {
         } catch (e) { alert("Gagal memindahkan kelas."); }
     };
 
-    const updateStudent = async (data) => {
-        const { id, ...rest } = data;
-        await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.students), id), rest);
-    };
-    
     const deleteStudent = async (id) => {
         if(confirm("Hapus siswa?")) await deleteDoc(doc(getCollectionRef(COLLECTION_PATHS.students), id));
     };
 
-    const addJournal = async (data) => {
-        const payload = {
-            ...data, teacherId: appUser.id, createdAt: new Date(),
-            studentNames: Array.isArray(data.studentNames) ? data.studentNames : [data.studentName]
-        };
-        await addDoc(getCollectionRef(COLLECTION_PATHS.journals), payload);
-    };
-
-    const updateJournal = async (data) => {
-        const { id, ...rest } = data;
-        const payload = { ...rest, updatedAt: new Date().toISOString(), studentNames: Array.isArray(data.studentNames) ? data.studentNames : [data.studentName] };
-        await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.journals), id), payload);
-        alert("Jurnal diperbarui.");
-    };
-
     const saveSettings = async (data) => {
-        // Settings juga disimpan per user
+        const sId = appUser.schoolId || appUser.id;
         if (mySettings.id) await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.settings), mySettings.id), data);
-        else await addDoc(getCollectionRef(COLLECTION_PATHS.settings), { ...data, userId: appUser.id });
-        alert("Pengaturan tersimpan.");
+        else await addDoc(getCollectionRef(COLLECTION_PATHS.settings), { ...data, schoolId: sId });
+        alert("Pengaturan sekolah berhasil diperbarui.");
     };
 
     const addPointLog = async (data) => {
@@ -265,21 +291,20 @@ export default function App() {
         }
     };
 
-    // --- FUNGSI SIMPAN MASTER DATA (ISOLATED) ---
     const saveMasterPoints = async (newItems) => {
+        const sId = appUser.schoolId || appUser.id;
         try {
-            // Simpan ke dokumen spesifik user: master_points_USERID
-            await setDoc(doc(db, 'settings', `master_points_${appUser.id}`), { items: newItems });
-            alert("Master data poin berhasil disimpan!");
-        } catch (e) { console.error(e); alert("Gagal menyimpan."); }
+            await setDoc(doc(db, 'settings', `master_points_${sId}`), { items: newItems });
+            alert("Master data poin sekolah berhasil disimpan!");
+        } catch (e) { alert("Gagal menyimpan."); }
     };
 
     const saveSanctionRules = async (newItems) => {
+        const sId = appUser.schoolId || appUser.id;
         try {
-            // Simpan ke dokumen spesifik user: sanction_rules_USERID
-            await setDoc(doc(db, 'settings', `sanction_rules_${appUser.id}`), { items: newItems });
+            await setDoc(doc(db, 'settings', `sanction_rules_${sId}`), { items: newItems });
             alert("Aturan sanksi berhasil disimpan!");
-        } catch (e) { console.error(e); alert("Gagal menyimpan."); }
+        } catch (e) { alert("Gagal menyimpan."); }
     };
 
     // --- RENDER ---
@@ -291,33 +316,50 @@ export default function App() {
         <Layout activeTab={activeTab} setActiveTab={setActiveTab} userRole={appUser.role} userName={appUser.fullName} onLogout={handleLogout}>
             {appUser.role === 'admin' ? (
                 <>
-                    {/* ADMIN VIEW: Hanya untuk Manajemen User */}
                     {activeTab === 'dashboard' && <AdminDashboard users={allUsers} studentsCount={students.length} journalsCount={journals.length} />}
                     {activeTab === 'users' && <AdminUserManagement users={allUsers} />}
                     {activeTab === 'account' && <AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />}
                 </>
             ) : (
                 <>
-                    {/* GURU VIEW: Menu Lengkap dengan Data Terisolasi */}
                     {activeTab === 'dashboard' && <GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} />}
                     
                     {activeTab === 'students' && (
                         <StudentManager 
                             students={students} 
+                            allTeachers={allUsers.filter(u => u.schoolId === appUser.schoolId && u.id !== appUser.id)} // Untuk Transfer
                             journals={journals}
                             pointLogs={pointLogs}
                             sanctionRules={sanctionRules}
+                            user={appUser} // Pass current user
                             onAdd={addStudent} 
                             onImport={importStudents} 
                             onMoveClass={handleMoveClass} 
-                            onEdit={updateStudent} 
-                            onDelete={deleteStudent} 
+                            onEdit={(d) => updateDoc(doc(getCollectionRef(COLLECTION_PATHS.students), d.id), d)} 
+                            onDelete={deleteStudent}
+                            // Props Transfer
+                            onRequestTransfer={requestTransfer}
+                            onApproveTransfer={approveTransfer}
+                            onRejectTransfer={rejectTransfer}
                         />
                     )}
                     
-                    {activeTab === 'journal' && <Journal students={students} journals={journals} onAdd={addJournal} onUpdate={updateJournal} settings={mySettings} />}
+                    {activeTab === 'journal' && (
+                        <Journal 
+                            students={students} 
+                            journals={journals} 
+                            onAdd={(d) => addDoc(getCollectionRef(COLLECTION_PATHS.journals), {...d, teacherId: appUser.id})} 
+                            onUpdate={(d) => updateDoc(doc(db, COLLECTION_PATHS.journals, d.id), d)} 
+                            // --- FITUR HAPUS JURNAL (BARU) ---
+                            onDelete={async (id) => {
+                                if(confirm("Hapus catatan jurnal ini secara permanen?")) {
+                                    await deleteDoc(doc(db, COLLECTION_PATHS.journals, id));
+                                }
+                            }}
+                            settings={mySettings} 
+                        />
+                    )}
                     
-                    {/* Halaman Catat Poin */}
                     {activeTab === 'points' && (
                         <PointManager 
                             students={students} 
@@ -330,7 +372,6 @@ export default function App() {
                         />
                     )}
 
-                    {/* Buku Poin Siswa */}
                     {activeTab === 'point_book' && (
                         <StudentPointBook 
                             students={students} 
@@ -341,7 +382,6 @@ export default function App() {
                         />
                     )}
 
-                    {/* Master Data: Data Poin (Data ini sekarang UNIK per user) */}
                     {activeTab === 'master_points' && (
                         <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
                             <MasterDataSettings 

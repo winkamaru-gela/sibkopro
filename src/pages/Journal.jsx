@@ -3,12 +3,13 @@ import {
     BookOpen, Search, X, Calendar, Edit, ClipboardList, 
     Save, RefreshCcw, Users, Clock, MapPin, AlignLeft, 
     CheckCircle2, Plus, History, ChevronRight, GraduationCap, 
-    Target, FileText, Activity, Info
+    Target, FileText, Activity, Info, Trash2 // Import Trash2
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 import { LAYANAN_TYPES, MASALAH_KATEGORI, SKKPD_LIST, TEKNIK_KONSELING } from '../utils/constants';
 
-const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
+// Tambahkan prop onDelete di sini
+const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) => {
     // UI State
     const [activeTab, setActiveTab] = useState('form'); 
     
@@ -122,8 +123,6 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
         };
         
         if (editingId) {
-            // Saat update, kita tetap update semesternya sesuai setting aktif 
-            // ATAU biarkan data lama (tergantung kebutuhan, di sini kita update ke aktif agar konsisten)
             onUpdate({ id: editingId, ...payload });
         } else {
             onAdd(payload);
@@ -168,7 +167,7 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
                         {editingId ? 'Edit Jurnal' : 'Jurnal Baru'}
                     </h2>
                     
-                    {/* INFO BANNER: Menampilkan Semester Aktif */}
+                    {/* INFO BANNER */}
                     <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 border border-blue-100">
                         <Info size={14}/>
                         <span>Periode Aktif: <b>{settings?.semester || 'Semester ?'} {settings?.academicYear || ''}</b></span>
@@ -329,14 +328,22 @@ const Journal = ({ students, journals, onAdd, onUpdate, settings }) => {
                 <div className="space-y-4 pb-24 md:pb-10">
                     {journals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(j => (
                         <div key={j.id} className={`bg-white border rounded-2xl p-5 transition-all hover:shadow-lg hover:border-blue-200 group relative ${editingId === j.id ? 'border-orange-400 bg-orange-50 ring-1 ring-orange-200' : 'border-slate-200'}`}>
-                            {/* Actions */}
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            
+                            {/* Actions Buttons (EDIT & DELETE) */}
+                            <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                     onClick={() => handleEditClick(j)} 
-                                    className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-blue-600 transition-colors shadow-sm bg-slate-50"
-                                    title="Edit Jurnal Ini"
+                                    className="p-2 rounded-full text-blue-400 hover:text-white hover:bg-blue-600 transition-colors shadow-sm bg-slate-50 border border-slate-100"
+                                    title="Edit Jurnal"
                                 >
                                     <Edit size={16}/>
+                                </button>
+                                <button 
+                                    onClick={() => onDelete(j.id)} 
+                                    className="p-2 rounded-full text-red-400 hover:text-white hover:bg-red-600 transition-colors shadow-sm bg-slate-50 border border-slate-100"
+                                    title="Hapus Jurnal"
+                                >
+                                    <Trash2 size={16}/>
                                 </button>
                             </div>
 
