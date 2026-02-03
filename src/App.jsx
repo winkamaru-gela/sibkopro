@@ -22,6 +22,7 @@ import AccountSettings from './pages/AccountSettings';
 import PointManager from './pages/PointManager';         
 import MasterDataSettings from './pages/MasterDataSettings'; 
 import StudentPointBook from './pages/StudentPointBook';
+import SanctionBook from './pages/SanctionBook';
 
 export default function App() {
     const [authUser, setAuthUser] = useState(null); 
@@ -336,7 +337,16 @@ export default function App() {
                             sanctionRules={sanctionRules}
                         />
                     )}
-
+                   
+                   {activeTab === 'sanction_book' && (
+                        <SanctionBook 
+                            students={students}
+                            pointLogs={pointLogs}
+                            sanctionRules={sanctionRules}
+                            settings={mySettings}
+                        />
+                    )}
+                    
                     {activeTab === 'master_points' && (
                         <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
                             <MasterDataSettings 

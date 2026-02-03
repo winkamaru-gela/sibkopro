@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, 
     X, List, Trophy, Database, ChevronDown, ChevronRight, School,
-    BookUser // Ikon baru untuk Buku Poin
+    BookUser, Gavel // Tambahkan Import Gavel (Ikon Palu)
 } from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogout }) => {
@@ -32,22 +32,25 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
         : [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
             
-            // 1. Jurnal Harian (Posisi Ditukar)
+            // 1. Jurnal Harian
             { id: 'journal', label: 'Jurnal Harian', icon: BookOpen },
             
-            // 2. Data Siswa (Posisi Ditukar)
+            // 2. Data Siswa
             { id: 'students', label: 'Data Siswa', icon: Users },
             
             // 3. Menu Operasional Poin
             { id: 'points', label: 'Catat Poin Siswa', icon: Trophy }, 
             
-            // 4. Buku Poin Siswa (Menu Baru)
+            // 4. Buku Poin Siswa
             { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser },
 
-            // 5. Menu Laporan
+            // 5. Buku Sanksi (MENU BARU)
+            { id: 'sanction_book', label: 'Buku Sanksi Siswa', icon: Gavel },
+
+            // 6. Menu Laporan
             { id: 'reports', label: 'Cetak Laporan', icon: Printer },
 
-            // 6. Master Data (Group) - Di bawah Laporan
+            // 7. Master Data (Group)
             { 
                 id: 'master_group', 
                 label: 'Master Data', 

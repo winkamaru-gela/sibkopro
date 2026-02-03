@@ -22,6 +22,7 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
                     .print-portal-root { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; z-index: 9999 !important; background-color: white !important; }
                     .print-paper-content { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
                     .print-header-actions { display: none !important; }
+                    .no-break { page-break-inside: avoid; }
                     table { width: 100% !important; border-collapse: collapse !important; }
                     tr { page-break-inside: avoid; }
                     td, th { border: 1px solid black !important; padding: 4px; color: black !important; }
@@ -69,18 +70,22 @@ const Reports = ({ journals, students, settings }) => {
     const [filterYear, setFilterYear] = useState(settings?.academicYear || '2024/2025');
     
     // --- STATE KHUSUS LAPORAN KLASIKAL ---
-    const [filterClass, setFilterClass] = useState(''); // Filter Kelas
+    const [filterClass, setFilterClass] = useState(''); 
 
     // --- STATE KHUSUS REKAM JEJAK ---
     const [selectedStudentId, setSelectedStudentId] = useState('');
-    const [studentSearch, setStudentSearch] = useState(''); // Pencarian Nama Siswa
+    const [studentSearch, setStudentSearch] = useState('');
     const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
 
     // --- STATE KHUSUS BUKTI LAYANAN ---
     const [selectedJournalId, setSelectedJournalId] = useState('');
-    const [proofFilterMode, setProofFilterMode] = useState('month'); // 'all', 'month', 'year'
+    const [proofFilterMode, setProofFilterMode] = useState('month'); 
     const [proofDate, setProofDate] = useState(new Date().toISOString().slice(0, 7));
-    const [proofSearch, setProofSearch] = useState(''); // Pencarian Teks Jurnal
+    const [proofSearch, setProofSearch] = useState('');
+
+    // --- STATE KHUSUS PETA KERAWANAN ---
+    const [filterRisk, setFilterRisk] = useState('all'); // all, high, medium, low
+    const [filterRiskClass, setFilterRiskClass] = useState(''); // Filter Kelas untuk Peta Kerawanan
 
     // --- MEMOIZED DATA ---
     const uniqueClasses = useMemo(() => [...new Set(students.map(s => s.class))].sort(), [students]);
@@ -92,19 +97,17 @@ const Reports = ({ journals, students, settings }) => {
 
     const filteredJournalsForProof = useMemo(() => {
         return journals.filter(j => {
-            // 1. Filter Waktu
             let dateMatch = true;
             if (proofFilterMode === 'month') dateMatch = j.date.startsWith(proofDate);
             if (proofFilterMode === 'year') dateMatch = j.date.startsWith(proofDate.slice(0, 4));
             
-            // 2. Filter Teks (Jenis Layanan / Deskripsi)
             const searchLower = proofSearch.toLowerCase();
             const textMatch = !proofSearch || 
                 j.serviceType.toLowerCase().includes(searchLower) || 
                 j.description.toLowerCase().includes(searchLower);
 
             return dateMatch && textMatch;
-        }).sort((a,b) => b.date.localeCompare(a.date)); // Terbaru di atas
+        }).sort((a,b) => b.date.localeCompare(a.date));
     }, [journals, proofFilterMode, proofDate, proofSearch]);
 
     const REPORT_TYPES = [
@@ -121,7 +124,14 @@ const Reports = ({ journals, students, settings }) => {
             case 'journal': return <JournalContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} settings={settings} />;
             case 'classReport': return <ClassReportContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} filterClass={filterClass} settings={settings} />;
             case 'individual': return <IndividualContent journals={journals} students={students} studentId={selectedStudentId} settings={settings} />;
-            case 'riskMap': return <RiskMapContent students={students} year={filterYear} settings={settings} />;
+            case 'riskMap': 
+                return <RiskMapContent 
+                            students={students} 
+                            year={filterYear} 
+                            settings={settings} 
+                            filterRisk={filterRisk} 
+                            filterRiskClass={filterRiskClass} 
+                        />;
             case 'serviceProof': return <ServiceProofContent journals={journals} journalId={selectedJournalId} settings={settings} />;
             default: return null;
         }
@@ -142,7 +152,6 @@ const Reports = ({ journals, students, settings }) => {
                     {/* FORM FILTER */}
                     <div className="grid grid-cols-1 gap-6 mb-6">
                         
-                        {/* 1. FILTER UMUM (JURNAL & KLASIKAL) */}
                         {(activeTab === 'journal' || activeTab === 'classReport') && (
                             <>
                                 <div>
@@ -176,7 +185,6 @@ const Reports = ({ journals, students, settings }) => {
                             </>
                         )}
 
-                        {/* 2. FILTER REKAM JEJAK (PENCARIAN SISWA) */}
                         {activeTab === 'individual' && (
                             <div className="relative">
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari Nama Siswa</label>
@@ -221,10 +229,8 @@ const Reports = ({ journals, students, settings }) => {
                             </div>
                         )}
 
-                        {/* 3. FILTER BUKTI LAYANAN (JURNAL ADVANCED FILTER) */}
                         {activeTab === 'serviceProof' && (
                             <div className="space-y-4">
-                                {/* Mode Filter */}
                                 <div className="flex bg-slate-100 p-1 rounded-lg">
                                     {['all', 'month', 'year'].map(mode => (
                                         <button
@@ -237,7 +243,6 @@ const Reports = ({ journals, students, settings }) => {
                                     ))}
                                 </div>
 
-                                {/* Date Input */}
                                 {proofFilterMode !== 'all' && (
                                     <div>
                                         <input 
@@ -250,7 +255,6 @@ const Reports = ({ journals, students, settings }) => {
                                     </div>
                                 )}
 
-                                {/* Search Text */}
                                 <div className="relative">
                                     <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
                                     <input 
@@ -262,7 +266,6 @@ const Reports = ({ journals, students, settings }) => {
                                     />
                                 </div>
 
-                                {/* List Journal Result */}
                                 <div className="border border-slate-200 rounded-lg max-h-60 overflow-y-auto bg-slate-50">
                                     {filteredJournalsForProof.length > 0 ? (
                                         filteredJournalsForProof.map(j => (
@@ -286,9 +289,42 @@ const Reports = ({ journals, students, settings }) => {
                             </div>
                         )}
                         
+                        {/* 4. FILTER PETA KERAWANAN (UPDATED) */}
                         {activeTab === 'riskMap' && (
-                            <div className="bg-blue-50 text-blue-700 p-3 rounded text-sm">
-                                Dokumen ini akan mencetak seluruh data siswa yang diurutkan berdasarkan tingkat kerawanan (Tinggi ke Rendah).
+                            <div className="space-y-4">
+                                <div className="bg-blue-50 text-blue-700 p-3 rounded text-sm">
+                                    Dokumen ini akan mencetak data siswa yang dikelompokkan per kelas dan diurutkan berdasarkan kerawanan.
+                                </div>
+                                
+                                {/* Filter Tingkat Kerawanan */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Tingkat Kerawanan</label>
+                                    <select 
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50"
+                                        value={filterRisk}
+                                        onChange={e => setFilterRisk(e.target.value)}
+                                    >
+                                        <option value="all">Semua Level</option>
+                                        <option value="High">Tinggi (High)</option>
+                                        <option value="Medium">Sedang (Medium)</option>
+                                        <option value="Low">Rendah (Low)</option>
+                                    </select>
+                                </div>
+
+                                {/* Filter Kelas (BARU) */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Kelas</label>
+                                    <select 
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50"
+                                        value={filterRiskClass}
+                                        onChange={e => setFilterRiskClass(e.target.value)}
+                                    >
+                                        <option value="">-- Semua Kelas --</option>
+                                        {uniqueClasses.map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -333,7 +369,6 @@ const Reports = ({ journals, students, settings }) => {
                                 <button 
                                     onClick={() => { 
                                         setActiveTab(tab.id); 
-                                        // Reset selection states when changing tabs
                                         setSelectedStudentId(''); 
                                         setStudentSearch('');
                                         setSelectedJournalId('');
@@ -474,7 +509,6 @@ const JournalContent = ({ journals, month, semester, year, settings }) => {
 };
 
 const ClassReportContent = ({ journals, month, semester, year, filterClass, settings }) => {
-    // UPDATED: Tambahkan filter Class
     const data = journals.filter(j => 
         j.date.startsWith(month) && 
         j.serviceType === 'Bimbingan Klasikal' &&
@@ -584,11 +618,40 @@ const IndividualContent = ({ journals, students, studentId, settings }) => {
     );
 };
 
-const RiskMapContent = ({ students, year, settings }) => {
-    const sorted = [...students].sort((a,b) => {
-        const riskVal = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
-        return (riskVal[b.riskLevel] || 0) - (riskVal[a.riskLevel] || 0);
-    });
+// =========================================================
+// 4. RISK MAP CONTENT (DIPERBARUI: FILTER & GROUPING)
+// =========================================================
+const RiskMapContent = ({ students, year, settings, filterRisk, filterRiskClass }) => {
+    // 1. Grouping dan Filtering
+    const { grouped, sortedClassNames, totalStudents } = useMemo(() => {
+        // Filter by Risk & Class
+        const filtered = students.filter(s => {
+            const riskMatch = filterRisk === 'all' || (s.riskLevel || 'Low').toLowerCase() === filterRisk.toLowerCase();
+            const classMatch = !filterRiskClass || s.class === filterRiskClass;
+            return riskMatch && classMatch;
+        });
+
+        // Group by Class
+        const groups = {};
+        filtered.forEach(s => {
+            const cls = s.class || 'Tanpa Kelas';
+            if (!groups[cls]) groups[cls] = [];
+            groups[cls].push(s);
+        });
+
+        // Sort Class Names
+        const classNames = Object.keys(groups).sort();
+
+        // Sort Students inside Class (High Risk First)
+        classNames.forEach(cls => {
+            groups[cls].sort((a,b) => {
+                const riskVal = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+                return (riskVal[b.riskLevel || 'LOW'] || 0) - (riskVal[a.riskLevel || 'LOW'] || 0);
+            });
+        });
+
+        return { grouped: groups, sortedClassNames: classNames, totalStudents: filtered.length };
+    }, [students, filterRisk, filterRiskClass]);
 
     return (
         <div className="text-sm">
@@ -596,33 +659,63 @@ const RiskMapContent = ({ students, year, settings }) => {
             <div className="text-center mb-6">
                 <h3 className="text-lg font-bold underline uppercase">PETA KERAWANAN SISWA</h3>
                 <p className="text-sm mt-1">Tahun Ajaran: {year}</p>
+                <div className="text-xs italic text-slate-600 mt-1 flex justify-center gap-2">
+                    <span>Level: {filterRisk === 'all' ? 'Semua' : filterRisk.toUpperCase()}</span>
+                    <span>|</span>
+                    <span>Kelas: {filterRiskClass || 'Semua'}</span>
+                    <span>|</span>
+                    <span>Total: {totalStudents} Siswa</span>
+                </div>
             </div>
-            <table className="w-full border-collapse border border-black text-xs">
-                <thead>
-                    <tr className="bg-gray-100 text-center">
-                        <th className="border border-black p-1 w-8">No</th>
-                        <th className="border border-black p-1">Nama Siswa</th>
-                        <th className="border border-black p-1 w-20">Kelas</th>
-                        <th className="border border-black p-1 w-32">Tingkat Kerawanan</th>
-                        <th className="border border-black p-1">Keterangan / Wali</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {sorted.map((s, i) => (
-                        <tr key={s.id}>
-                            <td className="border border-black p-1 text-center">{i+1}</td>
-                            <td className="border border-black p-1 font-bold">{s.name}</td>
-                            <td className="border border-black p-1 text-center">{s.class}</td>
-                            <td className="border border-black p-1 text-center font-bold">
-                                {s.riskLevel === 'HIGH' ? 'TINGGI' : s.riskLevel === 'MEDIUM' ? 'SEDANG' : 'RENDAH'}
-                            </td>
-                            <td className="border border-black p-1">
-                                {s.parent} {s.parentPhone ? `(${s.parentPhone})` : ''}
-                            </td>
-                        </tr>
+
+            {/* Render Tabel Per Kelas */}
+            {sortedClassNames.length > 0 ? (
+                <div className="space-y-6">
+                    {sortedClassNames.map(className => (
+                        <div key={className} className="no-break">
+                            <div className="bg-slate-100 border border-black border-b-0 p-1 px-2 font-bold text-xs flex justify-between">
+                                <span>KELAS: {className}</span>
+                                <span>{grouped[className].length} Siswa</span>
+                            </div>
+                            <table className="w-full border-collapse border border-black text-xs">
+                                <thead>
+                                    <tr className="bg-gray-50 text-center">
+                                        <th className="border border-black p-1 w-8">No</th>
+                                        <th className="border border-black p-1">Nama Siswa</th>
+                                        <th className="border border-black p-1 w-24">NISN</th>
+                                        <th className="border border-black p-1 w-24">Tingkat Kerawanan</th>
+                                        <th className="border border-black p-1">Keterangan / Wali</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {grouped[className].map((s, i) => (
+                                        <tr key={s.id}>
+                                            <td className="border border-black p-1 text-center">{i+1}</td>
+                                            <td className="border border-black p-1 font-bold">{s.name}</td>
+                                            <td className="border border-black p-1 text-center">{s.nisn || '-'}</td>
+                                            <td className="border border-black p-1 text-center">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                                    s.riskLevel === 'HIGH' ? 'bg-red-100 text-red-700 border-red-300' :
+                                                    s.riskLevel === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
+                                                    'bg-green-100 text-green-700 border-green-300'
+                                                }`}>
+                                                    {s.riskLevel === 'HIGH' ? 'TINGGI' : s.riskLevel === 'MEDIUM' ? 'SEDANG' : 'RENDAH'}
+                                                </span>
+                                            </td>
+                                            <td className="border border-black p-1">
+                                                {s.parent} {s.parentPhone ? `(${s.parentPhone})` : ''}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     ))}
-                </tbody>
-            </table>
+                </div>
+            ) : (
+                <div className="border border-black p-8 text-center italic">Tidak ada data siswa yang sesuai filter.</div>
+            )}
+
             <SignatureSection settings={settings} />
         </div>
     );

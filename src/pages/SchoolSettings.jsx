@@ -17,10 +17,14 @@ const SchoolSettings = ({ settings, onSave }) => {
         name: '',
         address: '',
         address2: '',
+        city: '', // Kota penandatanganan
+        // Data Pejabat
+        principal: '', nipPrincipal: '',
+        counselor: '', nipCounselor: '',
+        studentAffairs: '', nipStudentAffairs: '', // Data Kesiswaan Baru
         ...settings 
     });
     
-    // State untuk Tab Aktif
     const [activeTab, setActiveTab] = useState('periode');
 
     useEffect(() => {
@@ -29,481 +33,189 @@ const SchoolSettings = ({ settings, onSave }) => {
 
     const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
     
-    // Handler Upload File dengan Validasi Ukuran (Maks 1 MB)
+    // Handler Upload File (Sama seperti sebelumnya)
     const handleFile = (e, key) => {
         const file = e.target.files[0];
         if(file) {
-            // Cek ukuran file (1 MB = 1048576 bytes)
-            if (file.size > 1048576) {
-                alert("Ukuran file terlalu besar! Harap gunakan gambar dengan ukuran di bawah 1 MB.");
-                return; // Batalkan proses jika terlalu besar
-            }
-
+            if (file.size > 1048576) return alert("Ukuran file maksimal 1MB");
             const reader = new FileReader();
-            reader.onload = () => setForm(prev => ({...prev, [key]: reader.result}));
+            reader.onloadend = () => setForm(prev => ({ ...prev, [key]: reader.result }));
             reader.readAsDataURL(file);
         }
     };
 
-    // Handler Hapus Logo
-    const handleRemoveLogo = (key) => {
-        if(confirm('Hapus logo ini?')) {
-            setForm(prev => ({...prev, [key]: ''}));
-        }
+    const handleSave = () => {
+        onSave(form);
     };
 
-    // Daftar Menu Tab
-    const TABS = [
-        { id: 'periode', label: 'Tahun Ajaran', icon: CalendarClock, desc: 'Atur semester aktif & periode' },
-        { id: 'identitas', label: 'Identitas Sekolah', icon: Building2, desc: 'Nama, alamat, dan kota' },
-        { id: 'kop', label: 'Kop Surat', icon: LayoutTemplate, desc: 'Logo dan judul kop' },
-        { id: 'ttd', label: 'Penandatangan', icon: FileSignature, desc: 'Kepala Sekolah & Guru BK' },
-    ];
-
-    // FUNGSI RENDER KONTEN
-    const renderTabContent = (tabId) => {
-        switch (tabId) {
-            case 'periode':
-                return (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <div className="border-b pb-4 mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Periode Akademik</h2>
-                                <p className="text-sm text-slate-500">Pengaturan ini mempengaruhi filter laporan dan label semester pada jurnal.</p>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <InputGroup 
-                                    label="Tahun Ajaran Aktif" 
-                                    name="academicYear" 
-                                    value={form.academicYear} 
-                                    onChange={handleChange}
-                                    placeholder="Contoh: 2025/2026"
-                                    help="Format disarankan: TTTT/TTTT"
-                                />
-                                <div className="space-y-1">
-                                    <label className="block text-sm font-bold text-slate-700">Semester Aktif</label>
-                                    <select 
-                                        className="w-full p-2.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-sm" 
-                                        name="semester" 
-                                        value={form.semester || 'Ganjil'} 
-                                        onChange={handleChange}
-                                    >
-                                        <option value="Ganjil">Semester Ganjil</option>
-                                        <option value="Genap">Semester Genap</option>
-                                    </select>
-                                    <p className="text-[11px] text-slate-400 mt-1">Pilih semester yang sedang berjalan saat ini.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            
-            case 'identitas':
-                return (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <div className="border-b pb-4 mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Identitas Sekolah (Kop Surat)</h2>
-                                <p className="text-sm text-slate-500">Isi data secara berurutan sesuai struktur Kop Surat resmi.</p>
-                            </div>
-                            
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                    <InputGroup 
-                                        label="1. Instansi Induk / Pemerintah (Baris 1)" 
-                                        name="government" 
-                                        value={form.government} 
-                                        onChange={handleChange}
-                                        placeholder="PEMERINTAH PROVINSI ..."
-                                    />
-                                    <InputGroup 
-                                        label="2. Nama Dinas / Yayasan (Baris 2)" 
-                                        name="department" 
-                                        value={form.department} 
-                                        onChange={handleChange}
-                                        placeholder="DINAS PENDIDIKAN ..."
-                                    />
-                                </div>
-
-                                <InputGroup 
-                                    label="3. Nama Sekolah (Baris 3 - Utama)" 
-                                    name="name" 
-                                    value={form.name} 
-                                    onChange={handleChange}
-                                    placeholder="SMA NEGERI ..."
-                                    bold
-                                    customClass="text-lg"
-                                />
-
-                                <div className="grid grid-cols-1 gap-6">
-                                    <InputGroup 
-                                        label="4. Alamat Jalan / Desa (Baris 4)" 
-                                        name="address" 
-                                        value={form.address} 
-                                        onChange={handleChange}
-                                        placeholder="Jl. Raya No. 1, Desa..."
-                                    />
-                                    <InputGroup 
-                                        label="5. Kontak / Email / Website (Baris 5)" 
-                                        name="address2" 
-                                        value={form.address2} 
-                                        onChange={handleChange}
-                                        placeholder="Telp: (021) xxx | Email: sekolah@..."
-                                    />
-                                </div>
-                                
-                                <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100 mt-2">
-                                    <InputGroup 
-                                        label="Kota / Tempat Titimangsa Surat" 
-                                        name="city" 
-                                        value={form.city} 
-                                        onChange={handleChange}
-                                        placeholder="Contoh: Manado"
-                                        icon={<MapPin size={16}/>}
-                                        customClass="bg-white border-indigo-200 text-indigo-900 font-bold"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-
-            case 'kop':
-                return (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <div className="border-b pb-4 mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Logo & Preview Kop Surat</h2>
-                                <p className="text-sm text-slate-500">Pratinjau tampilan kop surat yang akan dicetak pada laporan.</p>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* LOGO KIRI */}
-                                <FlexibleLogoUploader 
-                                    label="Logo Kiri (Pemda/Yayasan)" 
-                                    imageValue={form.logo} 
-                                    onFileChange={(e) => handleFile(e, 'logo')}
-                                    onUrlChange={(val) => setForm(prev => ({...prev, logo: val}))}
-                                    onRemove={() => handleRemoveLogo('logo')}
-                                />
-                                
-                                {/* LOGO KANAN */}
-                                <FlexibleLogoUploader 
-                                    label="Logo Kanan (Sekolah/Tutwuri)" 
-                                    imageValue={form.logo2} 
-                                    onFileChange={(e) => handleFile(e, 'logo2')}
-                                    onUrlChange={(val) => setForm(prev => ({...prev, logo2: val}))}
-                                    onRemove={() => handleRemoveLogo('logo2')}
-                                />
-                            </div>
-
-                            <div className="mt-8 pt-6 border-t">
-                                <h3 className="font-bold text-sm text-slate-500 mb-3 uppercase tracking-wider">Simulasi Layout Kop</h3>
-                                
-                                {/* --- PREVIEW KOP SURAT (DIPERBARUI) --- */}
-                                <div className="border p-4 md:p-8 bg-white select-none shadow-sm relative overflow-hidden">
-                                    <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded border border-yellow-200">PREVIEW</div>
-                                    
-                                    {/* CONTAINER KOP */}
-                                    <div className="flex items-center justify-between gap-4 border-b-4 border-double border-black pb-4">
-                                        
-                                        {/* Logo Kiri */}
-                                        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                                            {form.logo ? <img src={form.logo} className="h-full w-full object-contain" alt="Logo Kiri"/> : <div className="w-full h-full bg-slate-100 border border-dashed flex items-center justify-center text-[10px] text-slate-400">Logo 1</div>}
-                                        </div>
-
-                                        {/* Teks Tengah (Centered & No Wrap) */}
-                                        <div className="text-center flex-1 min-w-0 px-2">
-                                            {/* Baris 1: Pemerintah */}
-                                            <h3 className="font-bold text-black text-sm md:text-lg uppercase tracking-wide whitespace-nowrap leading-tight">
-                                                {form.government || 'PEMERINTAH PROVINSI ...'}
-                                            </h3>
-                                            
-                                            {/* Baris 2: Dinas */}
-                                            <h3 className="font-bold text-black text-sm md:text-lg uppercase tracking-wide whitespace-nowrap leading-tight">
-                                                {form.department || 'DINAS PENDIDIKAN ...'}
-                                            </h3>
-                                            
-                                            {/* Baris 3: Sekolah (Lebih Tebal dikit, tapi ukuran sama) */}
-                                            <h1 className="font-extrabold text-black text-sm md:text-lg uppercase whitespace-nowrap leading-tight my-0.5">
-                                                {form.name || 'NAMA SEKOLAH'}
-                                            </h1>
-                                            
-                                            {/* Alamat (Font Serif, Italic, Kecil) */}
-                                            <div className="text-[10px] md:text-xs text-black font-serif italic leading-tight mt-1">
-                                                <p>{form.address || 'Alamat Lengkap Sekolah...'}</p>
-                                                {form.address2 && <p>{form.address2}</p>}
-                                            </div>
-                                        </div>
-
-                                        {/* Logo Kanan */}
-                                        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                                            {form.logo2 ? <img src={form.logo2} className="h-full w-full object-contain" alt="Logo Kanan"/> : <div className="w-full h-full bg-slate-100 border border-dashed flex items-center justify-center text-[10px] text-slate-400">Logo 2</div>}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-
-            case 'ttd':
-                return (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <div className="border-b pb-4 mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Pejabat Penandatangan</h2>
-                                <p className="text-sm text-slate-500">Nama dan NIP yang akan muncul di bagian bawah laporan.</p>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-100">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center font-bold text-slate-600">1</div>
-                                        <h3 className="font-bold text-slate-700">Kepala Sekolah</h3>
-                                    </div>
-                                    <InputGroup 
-                                        label="Nama Lengkap & Gelar" 
-                                        name="headmaster" 
-                                        value={form.headmaster} 
-                                        onChange={handleChange}
-                                        placeholder="Dr. H. Budi Santoso, M.Pd"
-                                    />
-                                    <InputGroup 
-                                        label="NIP / NIY" 
-                                        name="nipHeadmaster" 
-                                        value={form.nipHeadmaster} 
-                                        onChange={handleChange}
-                                        placeholder="197xxxx..."
-                                        fontMono
-                                    />
-                                </div>
-                                <div className="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-100">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center font-bold text-slate-600">2</div>
-                                        <h3 className="font-bold text-slate-700">Guru BK / Konselor</h3>
-                                    </div>
-                                    <InputGroup 
-                                        label="Nama Lengkap & Gelar" 
-                                        name="counselor" 
-                                        value={form.counselor} 
-                                        onChange={handleChange}
-                                        placeholder="Siti Aminah, S.Pd"
-                                    />
-                                    <InputGroup 
-                                        label="NIP / NIY" 
-                                        name="nipCounselor" 
-                                        value={form.nipCounselor} 
-                                        onChange={handleChange}
-                                        placeholder="199xxxx..."
-                                        fontMono
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            default: return null;
-        }
-    };
+    // Sub-component Tab Button
+    const TabButton = ({ id, label, icon: Icon }) => (
+        <button 
+            onClick={() => setActiveTab(id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-l-4 ${
+                activeTab === id 
+                ? 'bg-blue-50 border-blue-600 text-blue-700' 
+                : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+            }`}
+        >
+            <Icon size={18} />
+            <span>{label}</span>
+            {activeTab === id && <ChevronRight size={16} className="ml-auto opacity-50"/>}
+        </button>
+    );
 
     return (
-        <div className="flex flex-col h-full bg-slate-50">
-            {/* HEADER */}
-            <div className="bg-white border-b px-4 md:px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm flex-shrink-0">
-                <div>
-                    <h1 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <Settings className="text-blue-600" /> Pengaturan Sekolah
-                    </h1>
-                    <p className="text-xs text-slate-500 mt-1 hidden md:block">Kelola data instansi untuk keperluan laporan otomatis.</p>
+        <div className="p-6 max-w-5xl mx-auto pb-24">
+            <h1 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <Settings className="text-blue-600"/> Pengaturan Sekolah
+            </h1>
+
+            <div className="flex flex-col md:flex-row gap-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+                {/* Sidebar Tab */}
+                <div className="w-full md:w-64 bg-white border-r border-slate-100 py-4 flex-shrink-0">
+                    <div className="px-4 mb-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Menu Pengaturan</div>
+                    <nav className="space-y-1">
+                        <TabButton id="periode" label="Tahun Ajaran" icon={CalendarClock} />
+                        <TabButton id="identitas" label="Identitas Sekolah" icon={Building2} />
+                        <TabButton id="kop" label="Kop Surat & Logo" icon={LayoutTemplate} />
+                        <TabButton id="pejabat" label="Pejabat Penandatangan" icon={FileSignature} />
+                    </nav>
                 </div>
-                <button 
-                    onClick={() => onSave(form)} 
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95 text-sm md:text-base"
-                >
-                    <Save size={18}/> <span className="hidden md:inline">Simpan Perubahan</span><span className="md:hidden">Simpan</span>
-                </button>
+
+                {/* Content Area */}
+                <div className="flex-1 p-6 md:p-8 overflow-y-auto">
+                    
+                    {/* 1. TAHUN AJARAN */}
+                    {activeTab === 'periode' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h2 className="text-lg font-bold border-b pb-2 mb-4">Periode Akademik</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <InputGroup label="Tahun Pelajaran" name="academicYear" value={form.academicYear} onChange={handleChange} placeholder="Contoh: 2025/2026" />
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-600 mb-2">Semester Aktif</label>
+                                    <select name="semester" value={form.semester} onChange={handleChange} className="w-full p-2.5 border rounded-lg bg-white">
+                                        <option value="Ganjil">Ganjil</option>
+                                        <option value="Genap">Genap</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 2. IDENTITAS SEKOLAH */}
+                    {activeTab === 'identitas' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h2 className="text-lg font-bold border-b pb-2 mb-4">Identitas Sekolah</h2>
+                            <InputGroup label="Nama Sekolah" name="name" value={form.name} onChange={handleChange} placeholder="SMK NEGERI 1 CONTOH" />
+                            <InputGroup label="Pemerintah Provinsi/Daerah" name="government" value={form.government} onChange={handleChange} placeholder="PEMERINTAH PROVINSI ..." />
+                            <InputGroup label="Dinas / Yayasan" name="department" value={form.department} onChange={handleChange} placeholder="DINAS PENDIDIKAN DAERAH" />
+                            
+                            <div className="grid grid-cols-1 gap-4">
+                                <InputGroup label="Alamat Baris 1 (Jalan)" name="address" value={form.address} onChange={handleChange} placeholder="Jl. Raya No. 1..." />
+                                <InputGroup label="Alamat Baris 2 (Telp/Web)" name="address2" value={form.address2} onChange={handleChange} placeholder="Telp: 0431-xxxxx website: ..." />
+                                <InputGroup label="Kota / Tempat Surat" name="city" value={form.city} onChange={handleChange} placeholder="Manado, Gorontalo, dll" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 3. PEJABAT PENANDATANGAN (UPDATED: Tambah Kesiswaan) */}
+                    {activeTab === 'pejabat' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h2 className="text-lg font-bold border-b pb-2 mb-4">Data Penandatangan Dokumen</h2>
+                            
+                            {/* Kepala Sekolah */}
+                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><UserCheckIcon /> Kepala Sekolah</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <InputGroup label="Nama Lengkap & Gelar" name="principal" value={form.principal} onChange={handleChange} placeholder="Nama Kepala Sekolah" />
+                                    <InputGroup label="NIP / NIY" name="nipPrincipal" value={form.nipPrincipal} onChange={handleChange} placeholder="NIP..." />
+                                </div>
+                            </div>
+
+                            {/* Guru BK */}
+                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><UserCheckIcon /> Guru BK / Konselor</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <InputGroup label="Nama Lengkap & Gelar" name="counselor" value={form.counselor} onChange={handleChange} placeholder="Nama Guru BK" />
+                                    <InputGroup label="NIP / NIY" name="nipCounselor" value={form.nipCounselor} onChange={handleChange} placeholder="NIP..." />
+                                </div>
+                            </div>
+
+                            {/* Waka Kesiswaan (BARU) */}
+                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><UserCheckIcon /> Waka Kesiswaan</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <InputGroup label="Nama Lengkap & Gelar" name="studentAffairs" value={form.studentAffairs} onChange={handleChange} placeholder="Nama Waka Kesiswaan" />
+                                    <InputGroup label="NIP / NIY" name="nipStudentAffairs" value={form.nipStudentAffairs} onChange={handleChange} placeholder="NIP..." />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 4. LOGO & KOP SURAT */}
+                    {activeTab === 'kop' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h2 className="text-lg font-bold border-b pb-2 mb-4">Logo Kop Surat</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <ImageUploader label="Logo Kiri (Pemda/Yayasan)" imageValue={form.logo} onFileChange={(e) => handleFile(e, 'logo')} onRemove={() => setForm({...form, logo: ''})} />
+                                <ImageUploader label="Logo Kanan (Sekolah/Tut Wuri)" imageValue={form.logo2} onFileChange={(e) => handleFile(e, 'logo2')} onRemove={() => setForm({...form, logo2: ''})} />
+                            </div>
+                        </div>
+                    )}
+
+                </div>
             </div>
 
-            {/* MAIN CONTENT WRAPPER */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 w-full no-scrollbar">
-                <div className="max-w-7xl mx-auto">
-                    
-                    {/* MOBILE ACCORDION */}
-                    <div className="md:hidden space-y-3">
-                        {TABS.map(tab => (
-                            <div key={tab.id} className={`bg-white rounded-xl border transition-all duration-300 overflow-hidden ${activeTab === tab.id ? 'border-blue-300 shadow-md ring-1 ring-blue-100' : 'border-slate-200'}`}>
-                                <button 
-                                    onClick={() => setActiveTab(activeTab === tab.id ? '' : tab.id)}
-                                    className={`w-full flex items-center justify-between p-4 text-left transition-colors ${activeTab === tab.id ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-full ${activeTab === tab.id ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                                            <tab.icon size={20} />
-                                        </div>
-                                        <span className="font-bold text-sm">{tab.label}</span>
-                                    </div>
-                                    {activeTab === tab.id ? <ChevronDown size={20}/> : <ChevronRight size={20} className="text-slate-400"/>}
-                                </button>
-                                {activeTab === tab.id && (
-                                    <div className="p-4 border-t border-blue-100 bg-slate-50/50">
-                                        {renderTabContent(tab.id)}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* DESKTOP LAYOUT */}
-                    <div className="hidden md:flex gap-6 items-start h-full">
-                        <aside className="w-64 flex-shrink-0">
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-6">
-                                <div className="p-4 border-b bg-slate-50">
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Menu Pengaturan</span>
-                                </div>
-                                <nav className="p-2 space-y-1">
-                                    {TABS.map(tab => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setActiveTab(tab.id)}
-                                            className={`w-full flex items-center text-left px-3 py-3 rounded-lg transition-all ${
-                                                activeTab === tab.id 
-                                                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 shadow-sm' 
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                            }`}
-                                        >
-                                            <div className={`p-2 rounded-md mr-3 ${activeTab === tab.id ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                <tab.icon size={18} />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-sm">{tab.label}</div>
-                                                <div className="text-[10px] opacity-70 hidden lg:block">{tab.desc}</div>
-                                            </div>
-                                            {activeTab === tab.id && <ChevronRight size={16} className="ml-auto text-blue-400"/>}
-                                        </button>
-                                    ))}
-                                </nav>
-                            </div>
-                        </aside>
-
-                        <main className="flex-1 w-full">
-                            {renderTabContent(activeTab)}
-                        </main>
-                    </div>
-
-                </div>
+            {/* Floating Save Button */}
+            <div className="fixed bottom-6 right-6 z-40">
+                <button 
+                    onClick={handleSave}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full shadow-xl font-bold transition-transform active:scale-95"
+                >
+                    <Save size={20}/> Simpan Pengaturan
+                </button>
             </div>
         </div>
     );
 };
 
-// --- HELPER COMPONENTS ---
+// Helper Components
+const UserCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>;
 
-const InputGroup = ({ label, name, value, onChange, placeholder, type = "text", help, bold, fontMono, icon, customClass }) => (
-    <div className="space-y-1.5 w-full">
-        <label className="block text-sm font-bold text-slate-700 flex items-center gap-2">
-            {icon} {label}
-        </label>
-        {type === 'textarea' ? (
-            <textarea 
-                className={`w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm ${bold ? 'font-bold' : ''} ${customClass}`}
-                rows="2"
-                name={name}
-                value={value || ''}
-                onChange={onChange}
-                placeholder={placeholder}
-            />
-        ) : (
-            <input 
-                className={`w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm ${bold ? 'font-bold text-slate-900' : 'text-slate-700'} ${fontMono ? 'font-mono' : ''} ${customClass}`}
-                type={type}
-                name={name}
-                value={value || ''}
-                onChange={onChange}
-                placeholder={placeholder}
-            />
-        )}
-        {help && <p className="text-[11px] text-slate-400 mt-1 leading-tight">{help}</p>}
+const InputGroup = ({ label, name, value, onChange, placeholder }) => (
+    <div>
+        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label>
+        <input 
+            type="text" 
+            name={name}
+            value={value || ''} 
+            onChange={onChange} 
+            placeholder={placeholder}
+            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+        />
     </div>
 );
 
-// KOMPONEN UPLOAD LOGO BARU (DUA MODE: FILE & URL)
-const FlexibleLogoUploader = ({ label, imageValue, onFileChange, onUrlChange, onRemove }) => {
-    const [inputType, setInputType] = useState('file'); // 'file' atau 'url'
-
-    return (
-        <div className="w-full">
-            <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-bold text-slate-700">{label}</label>
-                
-                {/* Switch Mode Input */}
-                <div className="flex bg-slate-100 rounded-md p-0.5">
-                    <button 
-                        onClick={() => setInputType('file')}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${inputType === 'file' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}
-                    >
-                        File
+const ImageUploader = ({ label, imageValue, onFileChange, onRemove }) => (
+    <div className="space-y-2">
+        <label className="block text-sm font-bold text-slate-700">{label}</label>
+        <div className="relative w-full h-40 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors group">
+            {imageValue ? (
+                <>
+                    <img src={imageValue} alt="Preview" className="h-full object-contain p-2" />
+                    <button onClick={onRemove} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 size={16}/>
                     </button>
-                    <button 
-                        onClick={() => setInputType('url')}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${inputType === 'url' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}
-                    >
-                        URL
-                    </button>
-                </div>
-            </div>
-
-            <div className="relative group">
-                <div className={`h-36 w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors relative overflow-hidden ${imageValue ? 'border-blue-300 bg-blue-50/30' : 'border-slate-300 bg-slate-50'}`}>
-                    
-                    {/* Tombol Hapus (Muncul jika ada gambar) */}
-                    {imageValue && (
-                        <button 
-                            onClick={onRemove}
-                            className="absolute top-2 right-2 bg-red-100 text-red-600 p-1.5 rounded-full hover:bg-red-200 transition-colors z-10"
-                            title="Hapus Logo"
-                        >
-                            <Trash2 size={14}/>
-                        </button>
-                    )}
-
-                    {imageValue ? (
-                        <img src={imageValue} className="h-full w-full object-contain p-2" alt="Preview"/>
-                    ) : (
-                        <div className="text-center text-slate-400 p-4 w-full">
-                            {inputType === 'file' ? (
-                                <>
-                                    <UploadCloud size={28} className="mx-auto mb-2 text-slate-300"/>
-                                    <span className="text-xs font-medium block">Klik area ini untuk upload file</span>
-                                    <span className="text-[10px] opacity-60">(JPG, PNG, maks 1MB)</span>
-                                </>
-                            ) : (
-                                <div className="w-full px-4">
-                                    <LinkIcon size={24} className="mx-auto mb-2 text-slate-300"/>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Tempel tautan gambar (https://...)" 
-                                        className="w-full text-xs p-2 border rounded bg-white text-center focus:ring-1 focus:ring-blue-400 outline-none"
-                                        onChange={(e) => onUrlChange(e.target.value)}
-                                        onClick={(e) => e.stopPropagation()} // Mencegah trigger file input
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Input File (Hanya aktif jika mode 'file' dan belum ada gambar) */}
-                {inputType === 'file' && !imageValue && (
-                    <input 
-                        type="file" 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                        onChange={onFileChange} 
-                        accept="image/*"
-                    />
-                )}
-            </div>
+                </>
+            ) : (
+                <>
+                    <UploadCloud size={32} className="text-slate-400 mb-2"/>
+                    <span className="text-xs text-slate-500">Klik untuk upload (Max 1MB)</span>
+                    <input type="file" onChange={onFileChange} accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" />
+                </>
+            )}
         </div>
-    );
-};
+    </div>
+);
 
 export default SchoolSettings;
