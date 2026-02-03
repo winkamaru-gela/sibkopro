@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
     Search, Printer, Shield, ShieldAlert, 
     BookOpen, History, Award, X, ChevronDown, AlertTriangle, Trophy,
-    FileText, Download 
+    FileText, Download, ListOrdered
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 
@@ -112,10 +112,11 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchRef = useRef(null);
 
-    // --- FITUR PRIVASI ---
+    // --- FITUR PRIVASI & OPSI CETAK ---
     const [privacyMode, setPrivacyMode] = useState({
         hideCounseling: false, 
-        maskDescription: true  
+        maskDescription: true,
+        showSanctionHistory: false // Opsi Baru: Riwayat Sanksi
     });
 
     useEffect(() => {
@@ -165,7 +166,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         setIsSearchOpen(false);
     };
 
-    // --- FUNGSI GENERATE WORD (DENGAN TABEL RINGKASAN LEBIH KECIL) ---
+    // --- FUNGSI GENERATE WORD ---
     const handleDownloadWord = () => {
         if (!student || !pointData) return;
 
@@ -179,7 +180,54 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         const violationLogs = logs.filter(l => l.type === 'violation');
         const achievementLogs = logs.filter(l => l.type === 'achievement');
 
-        // Style Definition
+        // LOGIKA RIWAYAT SANKSI (KRONOLOGIS)
+        let historyTableHTML = '';
+        if (privacyMode.showSanctionHistory) {
+            const sortedLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date)); // Oldest first
+            let runningBalance = 0;
+            const historyRows = sortedLogs.map((log, idx) => {
+                const val = parseInt(log.value || 0);
+                const isV = log.type === 'violation';
+                if(isV) runningBalance += val; else runningBalance -= val;
+                if(runningBalance < 0) runningBalance = 0;
+                
+                const rule = (sanctionRules || []).find(r => runningBalance >= parseInt(r.min) && runningBalance <= parseInt(r.max));
+                const status = rule ? rule.penalty : '-';
+                
+                return `
+                    <tr>
+                        <td style="border: 1px solid black; padding: 5px; text-align: center;">${idx+1}</td>
+                        <td style="border: 1px solid black; padding: 5px; text-align: center;">${formatIndoDate(log.date)}</td>
+                        <td style="border: 1px solid black; padding: 5px;">
+                            <b>${isV ? 'Pelanggaran' : 'Prestasi'}</b><br/>${log.description}
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; text-align: center; color: ${isV ? 'red' : 'green'}; font-weight: bold;">
+                            ${isV ? '+' : '-'}${val}
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; text-align: center; font-weight: bold;">${runningBalance}</td>
+                        <td style="border: 1px solid black; padding: 5px; background-color: #f9f9f9;">${status}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            historyTableHTML = `
+                <h4 style="margin-bottom: 5px; color: #854d0e; text-transform: uppercase;">RIWAYAT PERUBAHAN POIN & SANKSI</h4>
+                <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 11px;">
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #fef3c7;">No</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #fef3c7;">Tanggal</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #fef3c7;">Keterangan</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #fef3c7;">Ubah</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #fef3c7;">Total</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #fef3c7;">Status Sanksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>${historyRows || '<tr><td colspan="6" style="text-align:center;">Belum ada data.</td></tr>'}</tbody>
+                </table>
+            `;
+        }
+
         const tableStyle = `border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;`;
         const thStyle = `border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold;`;
         const tdStyle = `border: 1px solid black; padding: 5px;`;
@@ -238,6 +286,8 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                         </tbody>
                     </table>
                 ` : ''}
+
+                ${historyTableHTML}
 
                 <h4 style="margin-bottom: 5px; color: #b91c1c;">A. CATATAN PELANGGARAN</h4>
                 <table style="${tableStyle}">
@@ -404,16 +454,20 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                             <div className="flex items-center gap-3">
                                 <div className="bg-yellow-100 p-2 rounded-full text-yellow-700"><ShieldAlert size={20}/></div>
                                 <div>
-                                    <h4 className="font-bold text-slate-800 text-sm">Kontrol Privasi Dokumen</h4>
+                                    <h4 className="font-bold text-slate-800 text-sm">Kontrol Dokumen & Privasi</h4>
                                     <p className="text-xs text-slate-500">Atur informasi yang ditampilkan saat dicetak atau didownload.</p>
                                 </div>
                             </div>
-                            <div className="flex gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm">
+                            <div className="flex flex-wrap gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
+                                    <input type="checkbox" className="w-4 h-4 accent-orange-600" checked={privacyMode.showSanctionHistory} onChange={e => setPrivacyMode({...privacyMode, showSanctionHistory: e.target.checked})} />
+                                    <span className="text-xs font-bold text-slate-700">Tampilkan Riwayat Sanksi</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
                                     <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={privacyMode.maskDescription} onChange={e => setPrivacyMode({...privacyMode, maskDescription: e.target.checked})} />
                                     <span className="text-xs font-bold text-slate-700">Samarkan Topik</span>
                                 </label>
-                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm">
+                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
                                     <input type="checkbox" className="w-4 h-4 accent-red-600" checked={privacyMode.hideCounseling} onChange={e => setPrivacyMode({...privacyMode, hideCounseling: e.target.checked})} />
                                     <span className="text-xs font-bold text-slate-700">Sembunyikan BK</span>
                                 </label>
@@ -476,6 +530,33 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
     const isSurplus = achievementTotal > violationTotal;
     const displayScore = Math.abs(netScoreRaw);
     const scoreColorClass = isDeficit ? 'text-red-600' : (isSurplus ? 'text-green-600' : 'text-slate-800');
+
+    // LOGIKA RIWAYAT SANKSI (KRONOLOGIS)
+    const sanctionHistoryRows = useMemo(() => {
+        if (!privacyMode.showSanctionHistory) return [];
+        // Clone & Reverse agar urut dari lama ke baru (Kronologis)
+        const chronologicalLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        let runningBalance = 0;
+        return chronologicalLogs.map((log) => {
+            const val = parseInt(log.value || 0);
+            const isV = log.type === 'violation';
+            
+            if (isV) runningBalance += val;
+            else runningBalance -= val;
+            if (runningBalance < 0) runningBalance = 0;
+
+            const rule = (sanctionRules || []).find(r => runningBalance >= parseInt(r.min) && runningBalance <= parseInt(r.max));
+            
+            return {
+                ...log,
+                isViolation: isV,
+                pointVal: val,
+                currentBalance: runningBalance,
+                status: rule ? rule.penalty : '-'
+            };
+        });
+    }, [logs, privacyMode.showSanctionHistory, sanctionRules]);
 
     return (
         <div className={`text-slate-900 ${isPrintVersion ? 'text-sm' : 'p-8'}`}>
@@ -549,10 +630,10 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </tbody>
             </table>
 
-            {/* KETENTUAN SANKSI */}
+            {/* KETENTUAN SANKSI (JIKA MINUS) */}
             {isDeficit && activeSanction && (
                 <div className="mb-8">
-                    <h3 className="font-bold text-sm uppercase mb-2 text-red-700">Tindak Lanjut & Sanksi</h3>
+                    <h3 className="font-bold text-sm uppercase mb-2 text-red-700">Tindak Lanjut & Sanksi Saat Ini</h3>
                     <table className="w-full border-collapse border border-black text-xs">
                         <thead>
                             <tr className="bg-gray-100 text-center">
@@ -567,6 +648,46 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                                 <td className="border border-black p-2">{activeSanction.action}</td>
                                 <td className="border border-black p-2">{activeSanction.penalty}</td>
                             </tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* TABEL RIWAYAT SANKSI (OPSIONAL) - DIMUNCULKAN DI ATAS TABEL PELANGGARAN */}
+            {privacyMode.showSanctionHistory && (
+                <div className="mb-8 animate-in fade-in slide-in-from-top-2">
+                    <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-amber-700">
+                        <ListOrdered size={16}/> Riwayat Perubahan Poin & Status Sanksi
+                    </h3>
+                    <table className="w-full border-collapse border border-black text-xs">
+                        <thead>
+                            <tr className="bg-amber-50 text-center">
+                                <th className="border border-black p-1.5 w-8">No</th>
+                                <th className="border border-black p-1.5 w-24">Tanggal</th>
+                                <th className="border border-black p-1.5">Keterangan</th>
+                                <th className="border border-black p-1.5 w-16">Ubah</th>
+                                <th className="border border-black p-1.5 w-16">Total</th>
+                                <th className="border border-black p-1.5 w-1/3">Status Sanksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sanctionHistoryRows.length > 0 ? sanctionHistoryRows.map((row, i) => (
+                                <tr key={i}>
+                                    <td className="border border-black p-1.5 text-center">{i+1}</td>
+                                    <td className="border border-black p-1.5 text-center">{formatIndoDate(row.date)}</td>
+                                    <td className="border border-black p-1.5">
+                                        <div className="font-bold text-[10px] uppercase text-slate-500">{row.isViolation ? 'Pelanggaran' : 'Prestasi'}</div>
+                                        {row.description}
+                                    </td>
+                                    <td className={`border border-black p-1.5 text-center font-bold ${row.isViolation ? 'text-red-600' : 'text-green-600'}`}>
+                                        {row.isViolation ? '+' : '-'}{row.pointVal}
+                                    </td>
+                                    <td className="border border-black p-1.5 text-center font-bold bg-slate-50">{row.currentBalance}</td>
+                                    <td className="border border-black p-1.5 text-center text-[10px]">{row.status}</td>
+                                </tr>
+                            )) : (
+                                <tr><td colSpan="6" className="border border-black p-4 text-center italic">Belum ada riwayat perubahan poin.</td></tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

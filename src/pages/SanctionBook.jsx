@@ -1,47 +1,209 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Gavel, Printer, Search, FileText, X, AlertTriangle, Settings, Edit3, ListOrdered, Calendar, UserCheck, User } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { 
+    Gavel, Printer, Search, FileText, X, AlertTriangle, 
+    Settings, Edit3, ListOrdered, History, ChevronLeft, ChevronRight,
+    ArrowRight
+} from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 
+// ==========================================
+// 1. KOMPONEN MODAL CETAK (PORTAL)
+// ==========================================
+const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
+    if (!isOpen) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] bg-slate-900/95 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm print:bg-white print:static">
+            <style>{`
+                @media print {
+                    @page { size: A4; margin: 10mm; }
+                    #root, .app-container, header, aside, nav { display: none !important; }
+                    html, body { height: auto !important; overflow: visible !important; background-color: white !important; margin: 0 !important; padding: 0 !important; }
+                    .print-portal-root { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; z-index: 9999 !important; background-color: white !important; }
+                    .print-paper-content { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
+                    .print-header-actions { display: none !important; }
+                    table { width: 100% !important; border-collapse: collapse !important; }
+                    tr { page-break-inside: avoid; }
+                    td, th { border: 1px solid black !important; padding: 6px; color: black !important; }
+                    .no-print { display: none !important; }
+                }
+            `}</style>
+
+            <div className="bg-slate-800 text-white px-4 py-3 shadow-md flex justify-between items-center flex-shrink-0 border-b border-slate-700 print-header-actions">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-white"><Printer size={20} className="text-blue-400"/> {title}</h2>
+                <div className="flex gap-2">
+                    <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">Tutup</button>
+                    <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-blue-500/20 transition-all active:scale-95"><Printer size={16}/> Cetak</button>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-slate-900/50 print:bg-white print:p-0 print:overflow-visible print-portal-root">
+                <div className="print-paper-content bg-white text-slate-900 shadow-2xl w-full max-w-[210mm] min-h-[297mm] p-10 md:p-12 origin-top h-fit mx-auto">
+                    {children}
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
+
+// ==========================================
+// 2. KOMPONEN DOKUMEN RIWAYAT SANKSI
+// ==========================================
+const SanctionHistoryDoc = ({ student, logs, sanctionRules, settings }) => {
+    // Hitung Riwayat Kronologis
+    const historyData = useMemo(() => {
+        if (!student || !logs) return [];
+        // Urutkan dari terlama ke terbaru untuk hitung saldo berjalan
+        const sortedLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        let runningBalance = 0;
+        
+        return sortedLogs.map(log => {
+            const pointVal = parseInt(log.value || 0);
+            const isViolation = log.type === 'violation';
+            
+            // Pelanggaran menambah poin sanksi, Prestasi mengurangi
+            if (isViolation) {
+                runningBalance += pointVal;
+            } else {
+                runningBalance -= pointVal;
+            }
+            if (runningBalance < 0) runningBalance = 0; // Poin tidak bisa minus (opsional)
+
+            // Cek Sanksi pada titik poin ini
+            const activeRule = sanctionRules
+                .find(r => runningBalance >= parseInt(r.min) && runningBalance <= parseInt(r.max));
+            
+            return {
+                ...log,
+                isViolation,
+                pointVal,
+                runningBalance,
+                sanctionStatus: activeRule ? activeRule.penalty : '-'
+            };
+        });
+    }, [student, logs, sanctionRules]);
+
+    return (
+        <div className="font-serif text-black text-sm">
+            {/* KOP SURAT */}
+            <div className="flex items-center justify-between border-b-4 border-double border-black pb-4 mb-6">
+                <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                    {settings?.logo && <img src={settings.logo} className="object-contain max-h-full max-w-full" alt="Logo" />}
+                </div>
+                <div className="flex-1 text-center px-4 min-w-0">
+                    <h3 className="font-bold uppercase whitespace-nowrap leading-none mb-1 text-lg">{settings?.government || 'PEMERINTAH PROVINSI ...'}</h3>
+                    <h3 className="font-bold uppercase whitespace-nowrap leading-none mb-1 text-lg">{settings?.department || 'DINAS PENDIDIKAN'}</h3>
+                    <h1 className="font-black uppercase whitespace-nowrap leading-none mb-1 text-xl">{settings?.name || 'NAMA SEKOLAH'}</h1>
+                    <div className="text-xs font-serif italic leading-tight space-y-0.5">
+                        <p>{settings?.address || 'Alamat Sekolah...'}</p>
+                        {settings?.address2 && <p>{settings?.address2}</p>}
+                    </div>
+                </div>
+                <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                    {settings?.logo2 && <img src={settings.logo2} className="object-contain max-h-full max-w-full" alt="Logo" />}
+                </div>
+            </div>
+
+            <div className="text-center mb-8">
+                <h2 className="text-lg font-bold underline uppercase tracking-wide">RIWAYAT SANKSI & PERUBAHAN POIN</h2>
+            </div>
+
+            <table className="w-full mb-6 font-bold">
+                <tbody>
+                    <tr><td className="w-32 border-0 p-1">Nama Siswa</td><td className="border-0 p-1">: {student.name}</td><td className="w-24 border-0 p-1">Kelas</td><td className="border-0 p-1">: {student.class}</td></tr>
+                    <tr><td className="border-0 p-1">NISN</td><td className="border-0 p-1">: {student.nisn || '-'}</td><td className="border-0 p-1">Wali Kelas</td><td className="border-0 p-1">: {student.homeroomTeacher || '-'}</td></tr>
+                </tbody>
+            </table>
+
+            <table className="w-full border-collapse border border-black text-xs">
+                <thead>
+                    <tr className="bg-gray-100 text-center">
+                        <th className="border border-black p-2 w-8">No</th>
+                        <th className="border border-black p-2 w-24">Tanggal</th>
+                        <th className="border border-black p-2">Keterangan (Pelanggaran / Prestasi)</th>
+                        <th className="border border-black p-2 w-20">Perubahan</th>
+                        <th className="border border-black p-2 w-20">Total Poin</th>
+                        <th className="border border-black p-2 w-1/3">Status Sanksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {historyData.length > 0 ? historyData.map((item, idx) => (
+                        <tr key={idx}>
+                            <td className="border border-black p-2 text-center">{idx + 1}</td>
+                            <td className="border border-black p-2 text-center">{formatIndoDate(item.date)}</td>
+                            <td className="border border-black p-2">
+                                <div className="font-bold">{item.isViolation ? 'Pelanggaran' : 'Prestasi'}</div>
+                                <div className="italic">{item.description}</div>
+                            </td>
+                            <td className={`border border-black p-2 text-center font-bold ${item.isViolation ? 'text-red-600' : 'text-green-600'}`}>
+                                {item.isViolation ? `+${item.pointVal}` : `-${item.pointVal}`}
+                            </td>
+                            <td className="border border-black p-2 text-center font-bold">{item.runningBalance}</td>
+                            <td className="border border-black p-2 text-center bg-gray-50">{item.sanctionStatus}</td>
+                        </tr>
+                    )) : (
+                        <tr><td colSpan="6" className="border border-black p-4 text-center italic">Belum ada riwayat poin.</td></tr>
+                    )}
+                </tbody>
+            </table>
+
+            <div className="mt-12 flex justify-end break-inside-avoid">
+                <div className="w-64 text-center">
+                    <p>{settings?.city || 'Tempat'}, {new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
+                    <p>Guru BK / Konselor</p>
+                    <br/><br/><br/>
+                    <p className="font-bold underline">{settings?.counselor || '......................'}</p>
+                    <p>NIP. {settings?.nipCounselor || '......................'}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// 3. KOMPONEN UTAMA HALAMAN
+// ==========================================
 export default function SanctionBook({ students, pointLogs, sanctionRules, settings }) {
   const [searchTerm, setSearchTerm] = useState('');
   
-  // --- STATE MODAL & SURAT ---
+  // --- STATE MODAL SURAT ---
   const [showModal, setShowModal] = useState(false);
   const [selectedData, setSelectedData] = useState(null);
   
-  // Opsi Surat
+  // --- STATE MODAL RIWAYAT (BARU) ---
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedHistoryData, setSelectedHistoryData] = useState(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Opsi Surat & Tanda Tangan
   const [letterType, setLetterType] = useState('call'); 
   const [letterNumber, setLetterNumber] = useState('');
-  
-  // Opsi Tanda Tangan
-  const [signatories, setSignatories] = useState({
-      homeroom: true,   
-      counselor: true,  
-      studentAffairs: false, 
-      principal: false  
-  });
-
-  // Data NIP Wali Kelas (Manual Override)
+  const [signatories, setSignatories] = useState({ homeroom: true, counselor: true, studentAffairs: false, principal: false });
   const [homeroomNip, setHomeroomNip] = useState('');
 
-  // Data Jadwal & Lokasi 
+  // Editable Text
   const [meetDate, setMeetDate] = useState('');
   const [meetTime, setMeetTime] = useState('09.00 WITA');
   const [meetPlace, setMeetPlace] = useState(''); 
   const [meetPurpose, setMeetPurpose] = useState('Pembinaan & Konsultasi Siswa'); 
-
-  // --- STATE TEKS EDITABLE ---
   const [customBody, setCustomBody] = useState('');
   const [customClosing, setCustomClosing] = useState('');
-
-  // State Poin Janji
   const [promisePoints, setPromisePoints] = useState([
       "Mentaati segala Tata Tertib Sekolah yang berlaku.",
       "Tidak akan mengulangi kesalahan/pelanggaran yang sama maupun pelanggaran lainnya.",
       "Bersedia menerima sanksi yang lebih berat apabila melanggar janji ini (Skorsing / Dikembalikan ke Orang Tua)."
   ]);
 
-  // --- LOGIKA UTAMA: MENGHITUNG SISWA SANKSI ---
+  // Reset page saat search berubah
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+
+  // --- LOGIKA UTAMA ---
   const sanctionedStudents = useMemo(() => {
     if (!students || !pointLogs || !sanctionRules) return [];
     let results = [];
@@ -55,9 +217,7 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
         const activeSanction = sortedRules.find(r => netScore >= parseInt(r.min) && netScore <= parseInt(r.max));
 
         if (activeSanction && violationTotal > 0) {
-            results.push({
-                student, netScore, violationTotal, achievementTotal, activeSanction,
-            });
+            results.push({ student, netScore, violationTotal, achievementTotal, activeSanction, logs });
         }
     });
     return results.sort((a,b) => b.netScore - a.netScore);
@@ -68,29 +228,34 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
     item.student.class.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- GENERATE TEXT ---
+  // Pagination Slice
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+
+  // --- HANDLERS ---
   const handleOpenPrint = (data) => {
     setSelectedData(data);
     setLetterType('call');
-    
-    // Auto Generate Nomor
     const today = new Date();
     const monthRoman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"][today.getMonth()];
     setLetterNumber(`421.5/..../BK-SMK/${monthRoman}/${today.getFullYear()}`);
-    
-    // Set Default NIP Wali Kelas
     setHomeroomNip(data.student.homeroomTeacherNip || '');
-
     setMeetDate(new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
     setMeetPlace(`Ruang BK ${settings?.name || 'Sekolah'}`); 
     setMeetPurpose('Pembinaan & Konsultasi Siswa'); 
-    
     setCustomBody(`Sehubungan dengan hal tersebut, kami mengharap kehadiran Bapak/Ibu/Wali murid ke sekolah untuk berkonsultasi dan menindaklanjuti permasalahan ini pada:`);
     setCustomClosing(`Mengingat pentingnya hal tersebut bagi keberlangsungan pendidikan putra/putri Bapak/Ibu, kami sangat mengharapkan kehadirannya tepat waktu.\n\nAtas perhatian dan kerja samanya, kami sampaikan terima kasih.`);
-
     setShowModal(true);
   };
 
+  const handleOpenHistory = (data) => {
+      setSelectedHistoryData(data);
+      setShowHistoryModal(true);
+  };
+
+  // Helper Auto Text
   useEffect(() => {
     if(!selectedData) return;
     if(letterType === 'statement') {
@@ -102,7 +267,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
     }
   }, [letterType, selectedData]);
 
-  // --- HELPER NAMA ORANG TUA / WALI ---
   const getParentName = () => {
       const s = selectedData?.student;
       if (!s) return '..........................';
@@ -112,7 +276,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
       return '..........................';
   };
 
-  // --- HELPER UKURAN FONT KOP SURAT ---
   const getHeaderFontSize = (text) => {
       if (!text) return 'text-2xl'; 
       const len = text.length;
@@ -132,7 +295,7 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
              Buku Sanksi & Administrasi
            </h1>
            <p className="text-slate-500 text-sm mt-1 ml-12">
-             Monitoring pelanggaran siswa dan cetak dokumen pemanggilan otomatis.
+             Monitoring siswa bermasalah dan cetak dokumen administrasi otomatis.
            </p>
         </div>
         
@@ -158,13 +321,13 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                 <th className="p-4">Identitas Siswa</th>
                 <th className="p-4 text-center">Total Poin</th>
                 <th className="p-4">Status & Tindak Lanjut</th>
-                <th className="p-4 text-center w-40">Aksi</th>
+                <th className="p-4 text-center w-48">Aksi</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-                {filteredData.map((item, index) => (
+                {currentItems.map((item, index) => (
                 <tr key={item.student.id} className="hover:bg-blue-50/50 transition-colors group">
-                    <td className="p-4 text-center text-slate-500 font-mono">{index + 1}</td>
+                    <td className="p-4 text-center text-slate-500 font-mono">{index + 1 + indexOfFirstItem}</td>
                     <td className="p-4">
                         <div className="font-bold text-slate-800 text-base mb-1">{item.student.name}</div>
                         <div className="flex gap-2">
@@ -189,12 +352,22 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                         </div>
                     </td>
                     <td className="p-4 text-center">
-                        <button 
-                            onClick={() => handleOpenPrint(item)} 
-                            className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 mx-auto text-xs font-bold shadow-md transition-all active:scale-95 w-full"
-                        >
-                            <Printer size={14} /> Proses Surat
-                        </button>
+                        <div className="flex justify-center gap-2">
+                            {/* TOMBOL HISTORY (BARU) */}
+                            <button 
+                                onClick={() => handleOpenHistory(item)}
+                                className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-3 py-2 rounded-lg flex items-center justify-center gap-1 shadow-sm transition-all"
+                                title="Lihat Riwayat Sanksi"
+                            >
+                                <History size={16}/>
+                            </button>
+                            <button 
+                                onClick={() => handleOpenPrint(item)} 
+                                className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs font-bold shadow-md transition-all active:scale-95"
+                            >
+                                <Printer size={14} /> Proses Surat
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 ))}
@@ -208,9 +381,50 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
             </tbody>
             </table>
         </div>
+
+        {/* PAGINATION CONTROLS */}
+        {filteredData.length > 0 && (
+            <div className="flex justify-between items-center p-4 border-t bg-slate-50">
+                <span className="text-xs text-slate-500 font-medium">
+                    Hal {currentPage} dari {totalPages} (Total {filteredData.length} Siswa Bermasalah)
+                </span>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="p-2 bg-white border rounded hover:bg-slate-100 disabled:opacity-50 transition-colors"
+                    >
+                        <ChevronLeft size={16}/>
+                    </button>
+                    <button 
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="p-2 bg-white border rounded hover:bg-slate-100 disabled:opacity-50 transition-colors"
+                    >
+                        <ChevronRight size={16}/>
+                    </button>
+                </div>
+            </div>
+        )}
       </div>
 
-      {/* --- MODAL UTAMA --- */}
+      {/* --- MODAL RIWAYAT SANKSI (FITUR BARU) --- */}
+      <PrintPreviewModal 
+          isOpen={showHistoryModal} 
+          onClose={() => setShowHistoryModal(false)}
+          title="Riwayat Sanksi Siswa"
+      >
+          {selectedHistoryData && (
+              <SanctionHistoryDoc 
+                  student={selectedHistoryData.student}
+                  logs={selectedHistoryData.logs}
+                  sanctionRules={sanctionRules}
+                  settings={settings}
+              />
+          )}
+      </PrintPreviewModal>
+
+      {/* --- MODAL SURAT ADMINISTRASI (EXISTING) --- */}
       {showModal && selectedData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 md:p-6 print:p-0 print:bg-white print:fixed print:inset-0">
           
@@ -289,17 +503,11 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                         <div className="flex items-center gap-2 mb-2 text-slate-800 font-bold border-b pb-2"><UserCheck size={16} className="text-blue-500"/> Penandatangan</div>
                         
                         <div className="space-y-3">
-                            {/* Input NIP Wali Kelas Manual */}
                             <div>
                                 <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1 flex items-center gap-1">
                                     <User size={10}/> NIP Wali Kelas (Opsional)
                                 </label>
-                                <input 
-                                    value={homeroomNip} 
-                                    onChange={e => setHomeroomNip(e.target.value)} 
-                                    placeholder="Ketik NIP jika kosong..."
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 outline-none"
-                                />
+                                <input value={homeroomNip} onChange={e => setHomeroomNip(e.target.value)} placeholder="Ketik NIP jika kosong..." className="w-full p-2 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 outline-none"/>
                             </div>
 
                             <div className="grid grid-cols-1 gap-2 pt-2 border-t">
@@ -314,7 +522,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                 {/* --- PREVIEW PANEL (KANAN) --- */}
                 <div className="flex-1 bg-slate-200/50 p-8 overflow-y-auto flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
                     
-                    {/* KERTAS */}
                     <div className="bg-white shadow-xl print:shadow-none w-[210mm] min-h-[297mm] p-10 md:p-12 print:p-0 print:w-full print:h-auto print:static relative transition-all print:box-border" id="print-area">
                         
                         {/* 1. KOP SURAT */}
@@ -336,7 +543,7 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                             </div>
                         </div>
 
-                        {/* 2. KONTEN UTAMA */}
+                        {/* 2. KONTEN UTAMA SURAT */}
                         <div className="font-serif text-[12pt] leading-snug text-justify text-black print-text-wrap">
                             
                             {letterType === 'call' ? (
@@ -353,8 +560,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                                         </div>
                                         <div className="w-1/2 text-right">
                                             <p className="mb-6">{settings?.city || 'Tempat'}, {new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
-                                            
-                                            {/* Tujuan Surat (Diperlebar & Digeser Kiri) */}
                                             <div className="text-left inline-block w-80">
                                                 <p>Kepada Yth,</p>
                                                 <p className="font-bold">Bapak/Ibu Orang Tua/Wali</p>
@@ -428,14 +633,12 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                                             <p>Mengetahui/Menyetujui,</p>
                                             <p className="mb-2">Orang Tua / Wali</p>
                                             <div className="h-20 w-full"></div> 
-                                            {/* Nama Ortu: Single Line & Non-Wrapping */}
                                             <p className="font-bold underline w-full whitespace-nowrap">({getParentName()})</p>
                                         </div>
                                         <div className="text-center flex flex-col items-center">
                                             <p>Yang Membuat Pernyataan,</p>
                                             <p className="mb-2 invisible">Siswa Bersangkutan</p>
                                             <div className="h-20 w-20 border border-dashed border-slate-400 flex items-center justify-center text-[10px] text-slate-400 print:border-black print:text-black print:opacity-30 mb-1">MATERAI<br/>10.000</div>
-                                            {/* Nama Siswa: Single Line & Non-Wrapping */}
                                             <p className="font-bold underline w-full whitespace-nowrap">{selectedData.student.name}</p>
                                         </div>
                                     </div>
@@ -453,7 +656,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                                         <div className="w-64 text-center">
                                             <p>Wali Kelas</p>
                                             <br/><br/><br/>
-                                            {/* Nama: Single Line */}
                                             <p className="font-bold underline whitespace-nowrap">{selectedData.student.homeroomTeacher || '................'}</p>
                                             {homeroomNip ? <p>NIP. {homeroomNip}</p> : <p>NIP. ........................</p>}
                                         </div>
@@ -471,7 +673,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                                 {/* 2. BARIS BAWAH */}
                                 {(signatories.studentAffairs || signatories.principal) && (
                                     <div className="flex justify-center gap-20">
-                                        {/* KIRI: Kesiswaan */}
                                         {signatories.studentAffairs && (
                                             <div className="w-64 text-center">
                                                 <p>Waka Kesiswaan</p>
@@ -480,8 +681,6 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                                                 <p>NIP. {settings?.nipStudentAffairs}</p>
                                             </div>
                                         )}
-
-                                        {/* KANAN: Kepala Sekolah */}
                                         {signatories.principal && (
                                             <div className="w-64 text-center">
                                                 <p>Kepala Sekolah</p>
@@ -503,38 +702,10 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                 @media print {
                     body * { visibility: hidden; }
                     #print-area, #print-area * { visibility: visible; }
-                    
-                    html, body {
-                        height: auto !important;
-                        overflow: visible !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-
-                    #print-area {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        height: auto !important;
-                        margin: 0;
-                        padding: 0;
-                        box-shadow: none;
-                        background: white;
-                        display: block;
-                    }
-
-                    .break-inside-avoid { 
-                        page-break-inside: avoid; 
-                        break-inside: avoid;
-                    }
-                    
-                    * { 
-                        -webkit-print-color-adjust: exact !important; 
-                        color-adjust: exact !important; 
-                        color: black !important;
-                    }
-
+                    html, body { height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
+                    #print-area { position: absolute; left: 0; top: 0; width: 100%; height: auto !important; margin: 0; padding: 0; box-shadow: none; background: white; display: block; }
+                    .break-inside-avoid { page-break-inside: avoid; break-inside: avoid; }
+                    * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; color: black !important; }
                     .print\\:hidden { display: none !important; }
                 }
             `}</style>
