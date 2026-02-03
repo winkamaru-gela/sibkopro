@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom';
 import { 
     Gavel, Printer, Search, FileText, X, AlertTriangle, 
     Settings, Edit3, ListOrdered, History, ChevronLeft, ChevronRight,
-    ArrowRight
+    ArrowRight, User, Calendar, UserCheck
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 
 // ==========================================
-// 1. KOMPONEN MODAL CETAK (PORTAL)
+// 1. KOMPONEN MODAL CETAK (PORTAL) - Untuk Riwayat
 // ==========================================
 const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
@@ -55,32 +55,19 @@ const SanctionHistoryDoc = ({ student, logs, sanctionRules, settings }) => {
     // Hitung Riwayat Kronologis
     const historyData = useMemo(() => {
         if (!student || !logs) return [];
-        // Urutkan dari terlama ke terbaru untuk hitung saldo berjalan
         const sortedLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date));
         
         let runningBalance = 0;
-        
         return sortedLogs.map(log => {
             const pointVal = parseInt(log.value || 0);
             const isViolation = log.type === 'violation';
-            
-            // Pelanggaran menambah poin sanksi, Prestasi mengurangi
-            if (isViolation) {
-                runningBalance += pointVal;
-            } else {
-                runningBalance -= pointVal;
-            }
-            if (runningBalance < 0) runningBalance = 0; // Poin tidak bisa minus (opsional)
+            if (isViolation) runningBalance += pointVal; else runningBalance -= pointVal;
+            if (runningBalance < 0) runningBalance = 0;
 
-            // Cek Sanksi pada titik poin ini
-            const activeRule = sanctionRules
-                .find(r => runningBalance >= parseInt(r.min) && runningBalance <= parseInt(r.max));
+            const activeRule = sanctionRules.find(r => runningBalance >= parseInt(r.min) && runningBalance <= parseInt(r.max));
             
             return {
-                ...log,
-                isViolation,
-                pointVal,
-                runningBalance,
+                ...log, isViolation, pointVal, runningBalance,
                 sanctionStatus: activeRule ? activeRule.penalty : '-'
             };
         });
@@ -88,7 +75,6 @@ const SanctionHistoryDoc = ({ student, logs, sanctionRules, settings }) => {
 
     return (
         <div className="font-serif text-black text-sm">
-            {/* KOP SURAT */}
             <div className="flex items-center justify-between border-b-4 border-double border-black pb-4 mb-6">
                 <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
                     {settings?.logo && <img src={settings.logo} className="object-contain max-h-full max-w-full" alt="Logo" />}
@@ -123,7 +109,7 @@ const SanctionHistoryDoc = ({ student, logs, sanctionRules, settings }) => {
                     <tr className="bg-gray-100 text-center">
                         <th className="border border-black p-2 w-8">No</th>
                         <th className="border border-black p-2 w-24">Tanggal</th>
-                        <th className="border border-black p-2">Keterangan (Pelanggaran / Prestasi)</th>
+                        <th className="border border-black p-2">Keterangan</th>
                         <th className="border border-black p-2 w-20">Perubahan</th>
                         <th className="border border-black p-2 w-20">Total Poin</th>
                         <th className="border border-black p-2 w-1/3">Status Sanksi</th>
@@ -169,11 +155,11 @@ const SanctionHistoryDoc = ({ student, logs, sanctionRules, settings }) => {
 export default function SanctionBook({ students, pointLogs, sanctionRules, settings }) {
   const [searchTerm, setSearchTerm] = useState('');
   
-  // --- STATE MODAL SURAT ---
+  // --- STATE MODAL SURAT (PROSES SURAT) ---
   const [showModal, setShowModal] = useState(false);
   const [selectedData, setSelectedData] = useState(null);
   
-  // --- STATE MODAL RIWAYAT (BARU) ---
+  // --- STATE MODAL RIWAYAT ---
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedHistoryData, setSelectedHistoryData] = useState(null);
 
@@ -234,10 +220,12 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
-  // --- HANDLERS ---
+  // --- HANDLERS (FUNGSI UTAMA) ---
   const handleOpenPrint = (data) => {
     setSelectedData(data);
     setLetterType('call');
+    
+    // Auto Generate Nomor & Text
     const today = new Date();
     const monthRoman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"][today.getMonth()];
     setLetterNumber(`421.5/..../BK-SMK/${monthRoman}/${today.getFullYear()}`);
@@ -245,14 +233,16 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
     setMeetDate(new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
     setMeetPlace(`Ruang BK ${settings?.name || 'Sekolah'}`); 
     setMeetPurpose('Pembinaan & Konsultasi Siswa'); 
+    
     setCustomBody(`Sehubungan dengan hal tersebut, kami mengharap kehadiran Bapak/Ibu/Wali murid ke sekolah untuk berkonsultasi dan menindaklanjuti permasalahan ini pada:`);
     setCustomClosing(`Mengingat pentingnya hal tersebut bagi keberlangsungan pendidikan putra/putri Bapak/Ibu, kami sangat mengharapkan kehadirannya tepat waktu.\n\nAtas perhatian dan kerja samanya, kami sampaikan terima kasih.`);
-    setShowModal(true);
+    
+    setShowModal(true); // Buka Modal Surat
   };
 
   const handleOpenHistory = (data) => {
       setSelectedHistoryData(data);
-      setShowHistoryModal(true);
+      setShowHistoryModal(true); // Buka Modal Riwayat
   };
 
   // Helper Auto Text
@@ -353,7 +343,7 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                     </td>
                     <td className="p-4 text-center">
                         <div className="flex justify-center gap-2">
-                            {/* TOMBOL HISTORY (BARU) */}
+                            {/* TOMBOL HISTORY */}
                             <button 
                                 onClick={() => handleOpenHistory(item)}
                                 className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-3 py-2 rounded-lg flex items-center justify-center gap-1 shadow-sm transition-all"
@@ -361,6 +351,7 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
                             >
                                 <History size={16}/>
                             </button>
+                            {/* TOMBOL PROSES SURAT */}
                             <button 
                                 onClick={() => handleOpenPrint(item)} 
                                 className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs font-bold shadow-md transition-all active:scale-95"
@@ -408,7 +399,7 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
         )}
       </div>
 
-      {/* --- MODAL RIWAYAT SANKSI (FITUR BARU) --- */}
+      {/* --- MODAL RIWAYAT SANKSI (PORTAL) --- */}
       <PrintPreviewModal 
           isOpen={showHistoryModal} 
           onClose={() => setShowHistoryModal(false)}
@@ -424,9 +415,9 @@ export default function SanctionBook({ students, pointLogs, sanctionRules, setti
           )}
       </PrintPreviewModal>
 
-      {/* --- MODAL SURAT ADMINISTRASI (EXISTING) --- */}
+      {/* --- MODAL SURAT ADMINISTRASI (INLINE Z-9999) --- */}
       {showModal && selectedData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 md:p-6 print:p-0 print:bg-white print:fixed print:inset-0">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 md:p-6 print:p-0 print:bg-white print:fixed print:inset-0">
           
           <div className="bg-white w-full max-w-[95%] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden print:shadow-none print:h-auto print:w-full print:max-w-none print:rounded-none">
             
