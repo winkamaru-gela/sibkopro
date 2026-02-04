@@ -3,12 +3,11 @@ import {
     BookOpen, Search, X, Calendar, Edit, ClipboardList, 
     Save, RefreshCcw, Users, Clock, MapPin, AlignLeft, 
     CheckCircle2, Plus, History, ChevronRight, GraduationCap, 
-    Target, FileText, Activity, Info, Trash2 // Import Trash2
+    Target, FileText, Activity, Info, Trash2, Shield, Lock // Tambah icon Shield & Lock
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 import { LAYANAN_TYPES, MASALAH_KATEGORI, SKKPD_LIST, TEKNIK_KONSELING } from '../utils/constants';
 
-// Tambahkan prop onDelete di sini
 const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) => {
     // UI State
     const [activeTab, setActiveTab] = useState('form'); 
@@ -24,12 +23,17 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
         time: '',
         place: '',
         serviceType: LAYANAN_TYPES[0], 
-        skkpd: '',
-        technique: '',
+        
+        // Data Dropdown
+        category: MASALAH_KATEGORI[0],
+        skkpd: '',    // Ini digunakan sebagai "Bidang Bimbingan"
+        technique: '', // Teknik Konseling
+        
         description: '', 
+        isPrivate: false, // --- STATE BARU: BIMBINGAN PRIVASI ---
+
         processEval: '',
         resultEval: '',
-        category: MASALAH_KATEGORI[0],
         followUp: 'Selesai' 
     });
 
@@ -66,10 +70,15 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
             time: journal.time || '',
             place: journal.place || '',
             serviceType: journal.serviceType,
+            
+            // Load Data Dropdown
             category: journal.category || MASALAH_KATEGORI[0],
-            skkpd: journal.skkpd || '',
-            technique: journal.technique || '',
+            skkpd: journal.skkpd || '', // Bidang Bimbingan
+            technique: journal.technique || '', // Teknik
+            
             description: journal.description || '',
+            isPrivate: journal.isPrivate || false, // Load status privasi
+
             processEval: journal.processEval || '',
             resultEval: journal.resultEval || journal.result || '',
             followUp: journal.followUp || 'Selesai'
@@ -94,9 +103,14 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
     const resetForm = () => {
         setForm({ 
             date: new Date().toISOString().slice(0,10), description: '', 
-            processEval: '', resultEval: '', time: '', place: '', technique: '', 
+            processEval: '', resultEval: '', time: '', place: '', 
+            
+            technique: '', 
             category: MASALAH_KATEGORI[0],
-            serviceType: LAYANAN_TYPES[0], skkpd: '', followUp: 'Selesai'
+            skkpd: '', 
+            isPrivate: false,
+
+            serviceType: LAYANAN_TYPES[0], followUp: 'Selesai'
         });
         setSelectedStudents([]);
         setSelectedClass('');
@@ -109,10 +123,8 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
         if (isClassical && !selectedClass) return alert("Silakan pilih Kelas Sasaran!");
         if (!isClassical && selectedStudents.length === 0) return alert("Pilih minimal satu siswa!");
 
-        // --- INI BAGIAN PENTING: OTOMATIS INPUT SEMESTER & TAHUN AJARAN ---
         const payload = { 
             ...form, 
-            // Mengambil data dari Settings (Pengaturan Sekolah)
             academicYear: settings?.academicYear || '2024/2025', 
             semester: settings?.semester || 'Ganjil',
             
@@ -140,7 +152,7 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
     return (
         <div className="flex flex-col h-full bg-slate-100 md:flex-row md:overflow-hidden relative">
             
-            {/* MOBILE TAB NAVIGATION (Sticky Top) */}
+            {/* MOBILE TAB NAVIGATION */}
             <div className="md:hidden bg-white border-b sticky top-0 z-20 flex shadow-sm">
                 <button 
                     onClick={() => setActiveTab('form')}
@@ -167,7 +179,6 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                         {editingId ? 'Edit Jurnal' : 'Jurnal Baru'}
                     </h2>
                     
-                    {/* INFO BANNER */}
                     <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 border border-blue-100">
                         <Info size={14}/>
                         <span>Periode Aktif: <b>{settings?.semester || 'Semester ?'} {settings?.academicYear || ''}</b></span>
@@ -176,7 +187,7 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
 
                 <form onSubmit={handleSubmit} className="space-y-6 pb-20 md:pb-0">
                     
-                    {/* SECTION 1: INFO DASAR (Warna Biru Muda) */}
+                    {/* SECTION 1: WAKTU & TEMPAT */}
                     <div className="bg-blue-50/60 p-5 rounded-2xl border border-blue-100 space-y-4">
                         <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wider flex items-center gap-2 mb-1">
                             <Clock size={14}/> Waktu & Tempat
@@ -200,7 +211,7 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                         </div>
                     </div>
 
-                    {/* SECTION 2: JENIS & SASARAN (Warna Ungu Muda) */}
+                    {/* SECTION 2: JENIS & SASARAN */}
                     <div className="bg-purple-50/60 p-5 rounded-2xl border border-purple-100 space-y-4">
                         <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-2 mb-1">
                             <Target size={14}/> Jenis & Sasaran
@@ -268,18 +279,42 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                         </div>
                     </div>
 
-                    {/* SECTION 3: ISI KONTEN (Putih Bersih) */}
+                    {/* SECTION 3: ISI KONTEN */}
                     <div className="space-y-4 pt-2">
                         <InputGroup label="Topik / Masalah" icon={<FileText size={14}/>} value={form.description} onChange={e=>setForm({...form, description:e.target.value})} textarea placeholder="Uraikan topik atau masalah..." />
                         
+                        {/* INPUT BARU: CHECKBOX PRIVASI */}
+                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-3">
+                            <div className="pt-0.5">
+                                <input 
+                                    type="checkbox" 
+                                    id="privacyCheck"
+                                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300 cursor-pointer"
+                                    checked={form.isPrivate}
+                                    onChange={e => setForm({...form, isPrivate: e.target.checked})}
+                                />
+                            </div>
+                            <label htmlFor="privacyCheck" className="cursor-pointer select-none">
+                                <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+                                    <Shield size={16} className="text-yellow-600"/>
+                                    Tandai sebagai Bimbingan Privasi
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                    Topik layanan akan disembunyikan saat fitur "Samarkan Topik" diaktifkan pada dokumen.
+                                </p>
+                            </label>
+                        </div>
+
+                        {/* Dropdown Kategori & Bidang */}
                         <div className="grid grid-cols-2 gap-4">
                             <SelectGroup label="Kategori" value={form.category} onChange={e=>setForm({...form, category:e.target.value})} options={MASALAH_KATEGORI} />
                             <SelectGroup label="Bidang Bimbingan" value={form.skkpd} onChange={e=>setForm({...form, skkpd:e.target.value})} options={SKKPD_LIST} placeholder="-- Pilih --"/>
                         </div>
                         
+                        {/* Dropdown Teknik */}
                         <SelectGroup label="Teknik Konseling" icon={<GraduationCap size={14}/>} value={form.technique} onChange={e=>setForm({...form, technique:e.target.value})} options={TEKNIK_KONSELING} placeholder="-- Pilih Teknik --"/>
                         
-                        {/* EVALUASI (Warna Hijau Muda/Tosca) */}
+                        {/* EVALUASI */}
                         <div className="bg-teal-50/60 p-5 rounded-2xl border border-teal-100 space-y-4 mt-2">
                             <h3 className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2 mb-1">
                                 <Activity size={14}/> Evaluasi & Tindak Lanjut
@@ -289,8 +324,8 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                             <div className="pt-1">
                                 <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Status Akhir</label>
                                 <select className="w-full p-2.5 border border-teal-300 rounded-xl text-sm font-bold text-teal-800 bg-white" value={form.followUp} onChange={e=>setForm({...form, followUp:e.target.value})}>
-                                    <option value="Selesai">Masalah Selesai</option>
-                                    <option value="Pantau">Perlu Pantauan Berkala</option>
+                                    <option value="Masalah Selesai">Masalah Selesai</option>
+                                    <option value="Perlu Pantauan Berkala">Perlu Pantauan Berkala</option>
                                     <option value="Konseling Lanjutan">Jadwalkan Konseling Lanjutan</option>
                                     <option value="Konferensi Kasus">Konferensi Kasus</option>
                                     <option value="Alih Tangan Kasus">Alih Tangan Kasus</option>
@@ -329,22 +364,9 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                     {journals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(j => (
                         <div key={j.id} className={`bg-white border rounded-2xl p-5 transition-all hover:shadow-lg hover:border-blue-200 group relative ${editingId === j.id ? 'border-orange-400 bg-orange-50 ring-1 ring-orange-200' : 'border-slate-200'}`}>
                             
-                            {/* Actions Buttons (EDIT & DELETE) */}
                             <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    onClick={() => handleEditClick(j)} 
-                                    className="p-2 rounded-full text-blue-400 hover:text-white hover:bg-blue-600 transition-colors shadow-sm bg-slate-50 border border-slate-100"
-                                    title="Edit Jurnal"
-                                >
-                                    <Edit size={16}/>
-                                </button>
-                                <button 
-                                    onClick={() => onDelete(j.id)} 
-                                    className="p-2 rounded-full text-red-400 hover:text-white hover:bg-red-600 transition-colors shadow-sm bg-slate-50 border border-slate-100"
-                                    title="Hapus Jurnal"
-                                >
-                                    <Trash2 size={16}/>
-                                </button>
+                                <button onClick={() => handleEditClick(j)} className="p-2 rounded-full text-blue-400 hover:text-white hover:bg-blue-600 transition-colors shadow-sm bg-slate-50 border border-slate-100"><Edit size={16}/></button>
+                                <button onClick={() => onDelete(j.id)} className="p-2 rounded-full text-red-400 hover:text-white hover:bg-red-600 transition-colors shadow-sm bg-slate-50 border border-slate-100"><Trash2 size={16}/></button>
                             </div>
 
                             <div className="flex items-center gap-2 mb-3">
@@ -354,10 +376,7 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                                 <span className={`text-[10px] font-extrabold px-2 py-1 rounded-md uppercase tracking-wide ${j.serviceType?.includes('Klasikal') ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                     {j.serviceType}
                                 </span>
-                                {/* Indikator Semester di List */}
-                                <span className="text-[10px] text-slate-400 px-2 border-l border-slate-200">
-                                    {j.semester} {j.academicYear}
-                                </span>
+                                {j.isPrivate && <Lock size={12} className="text-red-500" />}
                             </div>
 
                             <h4 className="font-bold text-slate-800 mb-2 line-clamp-1 text-lg">
@@ -370,8 +389,8 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
 
                             <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 border-t pt-3 mt-auto">
                                 <div>
-                                    <span className="font-bold block text-slate-400 text-[10px] uppercase mb-0.5">Teknik Konseling</span>
-                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{j.technique || '-'}</span>
+                                    <span className="font-bold block text-slate-400 text-[10px] uppercase mb-0.5">Teknik & Bidang</span>
+                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{j.technique || '-'} • {j.skkpd || '-'}</span>
                                 </div>
                                 <div className="text-right">
                                     <span className="block font-bold text-slate-400 text-[10px] uppercase mb-0.5">Status Akhir</span>
@@ -383,29 +402,20 @@ const Journal = ({ students, journals, onAdd, onUpdate, onDelete, settings }) =>
                             </div>
                         </div>
                     ))}
-
                     {journals.length === 0 && (
                         <div className="text-center py-20 opacity-50">
                             <ClipboardList size={64} className="mx-auto mb-4 text-slate-300"/>
                             <p className="text-base font-medium text-slate-400">Belum ada jurnal tersimpan.</p>
-                            <p className="text-xs text-slate-400 mt-1">Silakan input data baru di formulir.</p>
                         </div>
                     )}
                 </div>
-
+                
                 {/* MOBILE FAB */}
-                <button 
-                    onClick={() => setActiveTab('form')}
-                    className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 transition-transform active:scale-95 z-30 ring-4 ring-blue-50"
-                >
-                    <Plus size={28}/>
-                </button>
+                <button onClick={() => setActiveTab('form')} className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 transition-transform active:scale-95 z-30 ring-4 ring-blue-50"><Plus size={28}/></button>
             </div>
         </div>
     );
 };
-
-// --- Sub Components untuk Kerapihan ---
 
 const InputGroup = ({ label, icon, value, onChange, placeholder, textarea, rows=3, customBorder }) => (
     <div>
@@ -413,20 +423,9 @@ const InputGroup = ({ label, icon, value, onChange, placeholder, textarea, rows=
             {icon && <span className="text-blue-500">{icon}</span>} {label}
         </label>
         {textarea ? (
-            <textarea 
-                className={`w-full p-3 border rounded-xl text-sm bg-white focus:ring-2 outline-none transition-all ${customBorder || 'border-slate-300 focus:ring-blue-500'}`}
-                rows={rows} 
-                placeholder={placeholder} 
-                value={value} 
-                onChange={onChange} 
-            />
+            <textarea className={`w-full p-3 border rounded-xl text-sm bg-white focus:ring-2 outline-none transition-all ${customBorder || 'border-slate-300 focus:ring-blue-500'}`} rows={rows} placeholder={placeholder} value={value} onChange={onChange} />
         ) : (
-            <input 
-                className={`w-full p-3 border rounded-xl text-sm bg-white focus:ring-2 outline-none transition-all ${customBorder || 'border-slate-300 focus:ring-blue-500'}`} 
-                placeholder={placeholder} 
-                value={value} 
-                onChange={onChange} 
-            />
+            <input className={`w-full p-3 border rounded-xl text-sm bg-white focus:ring-2 outline-none transition-all ${customBorder || 'border-slate-300 focus:ring-blue-500'}`} placeholder={placeholder} value={value} onChange={onChange} />
         )}
     </div>
 );
@@ -436,11 +435,7 @@ const SelectGroup = ({ label, icon, value, onChange, options, placeholder }) => 
         <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1.5">
             {icon && <span className="text-purple-500">{icon}</span>} {label}
         </label>
-        <select 
-            className="w-full p-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer text-slate-700" 
-            value={value} 
-            onChange={onChange}
-        >
+        <select className="w-full p-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer text-slate-700" value={value} onChange={onChange}>
             {placeholder && <option value="">{placeholder}</option>}
             {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>

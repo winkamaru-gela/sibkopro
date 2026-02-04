@@ -115,8 +115,8 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
     // --- FITUR PRIVASI & OPSI CETAK ---
     const [privacyMode, setPrivacyMode] = useState({
         hideCounseling: false, 
-        maskDescription: true,
-        showSanctionHistory: false // Opsi Baru: Riwayat Sanksi
+        maskDescription: true, // Default aktif
+        showSanctionHistory: false 
     });
 
     useEffect(() => {
@@ -183,7 +183,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         // LOGIKA RIWAYAT SANKSI (KRONOLOGIS)
         let historyTableHTML = '';
         if (privacyMode.showSanctionHistory) {
-            const sortedLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date)); // Oldest first
+            const sortedLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date)); 
             let runningBalance = 0;
             const historyRows = sortedLogs.map((log, idx) => {
                 const val = parseInt(log.value || 0);
@@ -227,6 +227,36 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                 </table>
             `;
         }
+
+        // GENERATE WORD: LOGIKA TABEL LAYANAN BARU (KLASIFIKASI vs KONTEN)
+        const counselingRows = counselingHistory.map((h, i) => {
+            const isHidden = privacyMode.maskDescription && h.isPrivate;
+            const descText = isHidden ? '--- Privasi (Topik Disamarkan) ---' : h.description;
+            
+            return `
+                <tr>
+                    <td style="border: 1px solid black; padding: 5px; text-align: center;">${i+1}</td>
+                    <td style="border: 1px solid black; padding: 5px; text-align: center;">${formatIndoDate(h.date)}</td>
+                    
+                    <td style="border: 1px solid black; padding: 5px; vertical-align: top;">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 4px;">
+                            ${h.serviceType}
+                        </div>
+                        <div style="font-size: 11px;">
+                            <b>Bidang:</b> ${h.skkpd || '-'}<br/>
+                            <b>Kategori:</b> ${h.category || '-'}<br/>
+                            <b>Teknik:</b> ${h.technique || '-'}
+                        </div>
+                    </td>
+
+                    <td style="border: 1px solid black; padding: 5px; vertical-align: top; font-style: ${isHidden ? 'italic' : 'normal'}; color: ${isHidden ? '#666' : '#000'};">
+                        ${descText}
+                    </td>
+
+                    <td style="border: 1px solid black; padding: 5px; vertical-align: top;">${h.followUp}</td>
+                </tr>
+            `;
+        }).join('');
 
         const tableStyle = `border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;`;
         const thStyle = `border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold;`;
@@ -325,21 +355,17 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
 
                 ${!privacyMode.hideCounseling ? `
                     <h4 style="margin-bottom: 5px; color: #1e40af;">C. RIWAYAT LAYANAN BK</h4>
-                    ${privacyMode.maskDescription ? '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Detail masalah disamarkan untuk privasi siswa.</p>' : ''}
+                    ${privacyMode.maskDescription ? '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>' : ''}
                     <table style="${tableStyle}">
                         <thead>
-                            <tr><th style="${thStyle} width: 30px;">No</th><th style="${thStyle} width: 100px;">Tanggal</th><th style="${thStyle} width: 120px;">Layanan</th><th style="${thStyle}">Topik / Masalah</th><th style="${thStyle}">Tindak Lanjut</th></tr>
+                            <tr>
+                                <th style="${thStyle} width: 30px;">No</th>
+                                <th style="${thStyle} width: 80px;">Tanggal</th>
+                                <th style="${thStyle} width: 180px;">Jenis & Detail Layanan</th> <th style="${thStyle}">Topik / Masalah</th> <th style="${thStyle} width: 100px;">Tindak Lanjut</th>
+                            </tr>
                         </thead>
                         <tbody>
-                            ${counselingHistory.length > 0 ? counselingHistory.map((h, i) => `
-                                <tr>
-                                    <td style="${tdStyle} ${centerTd}">${i+1}</td>
-                                    <td style="${tdStyle} ${centerTd}">${formatIndoDate(h.date)}</td>
-                                    <td style="${tdStyle}">${h.serviceType}</td>
-                                    <td style="${tdStyle} font-style: italic;">${privacyMode.maskDescription ? '--- Privasi Siswa Terjaga ---' : h.description}</td>
-                                    <td style="${tdStyle}">${h.followUp}</td>
-                                </tr>
-                            `).join('') : `<tr><td colspan="5" style="${tdStyle} ${centerTd} font-style: italic;">Belum ada riwayat layanan.</td></tr>`}
+                            ${counselingRows || `<tr><td colspan="5" style="${tdStyle} ${centerTd} font-style: italic;">Belum ada riwayat layanan.</td></tr>`}
                         </tbody>
                     </table>
                 ` : ''}
@@ -758,30 +784,46 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                         <Shield size={16}/> C. Riwayat Layanan Bimbingan Konseling
                     </h3>
                     {privacyMode.maskDescription && (
-                        <p className="text-[10px] italic mb-2 text-slate-500">*Detail masalah disamarkan untuk privasi siswa.</p>
+                        <p className="text-[10px] italic mb-2 text-slate-500">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>
                     )}
                     <table className="w-full border-collapse border border-black text-xs">
                         <thead>
                             <tr className="bg-slate-100 text-center">
                                 <th className="border border-black p-1.5 w-8">No</th>
                                 <th className="border border-black p-1.5 w-24">Tanggal</th>
-                                <th className="border border-black p-1.5 w-32">Layanan</th>
-                                <th className="border border-black p-1.5">Topik / Masalah</th>
-                                <th className="border border-black p-1.5">Tindak Lanjut</th>
+                                <th className="border border-black p-1.5 w-48">Jenis & Detail Layanan</th> <th className="border border-black p-1.5">Topik / Masalah</th> <th className="border border-black p-1.5 w-32">Tindak Lanjut</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {counselingHistory.length > 0 ? counselingHistory.map((h, i) => (
-                                <tr key={h.id}>
-                                    <td className="border border-black p-1.5 text-center">{i+1}</td>
-                                    <td className="border border-black p-1.5 text-center">{formatIndoDate(h.date)}</td>
-                                    <td className="border border-black p-1.5">{h.serviceType}</td>
-                                    <td className="border border-black p-1.5 italic">
-                                        {privacyMode.maskDescription ? '--- Privasi Siswa Terjaga ---' : h.description}
-                                    </td>
-                                    <td className="border border-black p-1.5">{h.followUp}</td>
-                                </tr>
-                            )) : (
+                            {counselingHistory.length > 0 ? counselingHistory.map((h, i) => {
+                                // LOGIKA BARU: HANYA SEMBUNYIKAN JIKA (FITUR AKTIF && DATA PRIVATE)
+                                const isHidden = privacyMode.maskDescription && h.isPrivate;
+                                return (
+                                    <tr key={h.id}>
+                                        <td className="border border-black p-1.5 text-center">{i+1}</td>
+                                        <td className="border border-black p-1.5 text-center">{formatIndoDate(h.date)}</td>
+                                        
+                                        {/* KOLOM GABUNGAN (JENIS LAYANAN & DETAIL) */}
+                                        <td className="border border-black p-1.5 text-left align-top">
+                                            <div className="font-bold underline mb-1">{h.serviceType}</div>
+                                            <div className="text-[10px] space-y-1">
+                                                <div><span className="font-bold">Bidang:</span> {h.skkpd || '-'}</div>
+                                                <div><span className="font-bold">Kategori:</span> {h.category || '-'}</div>
+                                                <div><span className="font-bold">Teknik:</span> {h.technique || '-'}</div>
+                                            </div>
+                                        </td>
+
+                                        {/* KOLOM TOPIK (BERDIRI SENDIRI DENGAN PRIVASI) */}
+                                        <td className="border border-black p-1.5 text-left align-top">
+                                            <div className={`text-sm ${isHidden ? 'italic text-gray-400' : ''}`}>
+                                                {isHidden ? '-- Privasi (Disamarkan) --' : h.description}
+                                            </div>
+                                        </td>
+
+                                        <td className="border border-black p-1.5 align-top">{h.followUp}</td>
+                                    </tr>
+                                );
+                            }) : (
                                 <tr><td colSpan="5" className="border border-black p-4 text-center italic">Belum ada riwayat layanan.</td></tr>
                             )}
                         </tbody>
