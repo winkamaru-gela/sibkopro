@@ -1,196 +1,62 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
-    Trophy, AlertTriangle, Search, PlusCircle, 
-    ChevronRight, AlertOctagon, Calendar, Check, ChevronDown, X,
-    Edit, Trash2, RefreshCcw
+    Trophy, AlertTriangle, Search, AlertOctagon, ChevronRight, ChevronLeft, User 
 } from 'lucide-react';
+import PointInputModal from '../components/points/PointInputModal';
 
-const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddPoint, onUpdatePoint, onDeletePoint }) => {
-    // State Tab
+const PointManager = ({ 
+    students, pointLogs, masterPoints, sanctionRules, 
+    onAddPoint, onUpdatePoint, onDeletePoint 
+}) => {
+    // --- STATE ---
     const [activeTab, setActiveTab] = useState('violation');
-    
-    // State UI Utama
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedStudent, setSelectedStudent] = useState(null); 
-    const [isInputModalOpen, setIsInputModalOpen] = useState(false); 
+    const [isModalOpen, setIsModalOpen] = useState(false); 
     
-    // State untuk Editing
-    const [editingLogId, setEditingLogId] = useState(null);
+    // --- STATE PAGINATION ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 12; // Grid 3x4 atau 4x3
 
-    // State untuk Custom Dropdown dengan Search
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [dropdownSearch, setDropdownSearch] = useState(''); 
-    const dropdownRef = useRef(null);
-    const searchInputRef = useRef(null);
+    // Reset pagination saat pencarian/tab berubah
+    useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab]);
 
-    // State Form Input
-    const [formData, setFormData] = useState({
-        code: '', 
-        value: 5,
-        description: '',
-        date: new Date().toISOString().slice(0, 10)
-    });
-
-    // Auto-focus ke input search saat dropdown dibuka
-    useEffect(() => {
-        if (isDropdownOpen && searchInputRef.current) {
-            setTimeout(() => {
-                searchInputRef.current.focus();
-            }, 100);
-        } else {
-            setDropdownSearch(''); 
-        }
-    }, [isDropdownOpen]);
-
-    // Tutup dropdown jika klik di luar
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsDropdownOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    const resetForm = () => {
-        setFormData({
-            code: '', 
-            value: 5,
-            description: '',
-            date: new Date().toISOString().slice(0, 10)
-        });
-        setEditingLogId(null);
-    };
-
-    // Fungsi ganti tab manual (Reset form agar bersih)
-    const handleTabChange = (tab) => {
-        setActiveTab(tab);
-        resetForm();
-        setSearchTerm('');
-        setSelectedStudent(null);
-        setIsInputModalOpen(false);
-    };
-
-    // 1. Kalkulasi Poin Siswa
-    const studentPoints = useMemo(() => {
+    // --- DATA PROCESSING ---
+    const processedStudents = useMemo(() => {
         return students.map(s => {
             const logs = pointLogs.filter(p => p.studentId === s.id);
-            const violationTotal = logs
-                .filter(p => p.type === 'violation')
-                .reduce((acc, curr) => acc + parseInt(curr.value || 0), 0);
-            
-            const achievementTotal = logs
-                .filter(p => p.type === 'achievement')
-                .reduce((acc, curr) => acc + parseInt(curr.value || 0), 0);
-
+            const violationTotal = logs.filter(p => p.type === 'violation').reduce((acc, curr) => acc + parseInt(curr.value || 0), 0);
+            const achievementTotal = logs.filter(p => p.type === 'achievement').reduce((acc, curr) => acc + parseInt(curr.value || 0), 0);
             const netScore = violationTotal - achievementTotal;
-
-            const activeSanction = (sanctionRules || [])
-                .sort((a,b) => b.max - a.max) 
-                .find(rule => netScore >= rule.min && netScore <= rule.max);
-
-            return {
-                ...s,
-                violationTotal,
-                achievementTotal,
-                netScore,
-                activeSanction,
-                logs: logs.sort((a,b) => new Date(b.date) - new Date(a.date))
-            };
+            const activeSanction = (sanctionRules || []).sort((a,b) => b.max - a.max).find(rule => netScore >= rule.min && netScore <= rule.max);
+            
+            return { ...s, violationTotal, achievementTotal, netScore, activeSanction };
         });
     }, [students, pointLogs, sanctionRules]);
 
-    // 2. Filter Siswa
     const filteredStudents = useMemo(() => {
-        return studentPoints.filter(s => 
+        return processedStudents.filter(s => 
             s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             s.class.toLowerCase().includes(searchTerm.toLowerCase())
         ).sort((a,b) => a.name.localeCompare(b.name)); 
-    }, [studentPoints, searchTerm]);
+    }, [processedStudents, searchTerm]);
 
-    // 3. Filter Master Data
-    const availableOptions = useMemo(() => {
-        return (masterPoints || []).filter(item => item.type === activeTab);
-    }, [masterPoints, activeTab]);
+    // --- PAGINATION SLICING ---
+    const paginatedStudents = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredStudents, currentPage]);
 
-    const filteredOptions = useMemo(() => {
-        if (!dropdownSearch) return availableOptions;
-        const lowerSearch = dropdownSearch.toLowerCase();
-        return availableOptions.filter(item => 
-            item.code.toLowerCase().includes(lowerSearch) || 
-            item.label.toLowerCase().includes(lowerSearch)
-        );
-    }, [availableOptions, dropdownSearch]);
-
-    // --- HANDLERS ---
+    const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
 
     const handleStudentClick = (student) => {
         setSelectedStudent(student);
-        setIsInputModalOpen(true);
-        resetForm();
-    };
-
-    const handleSelectOption = (item) => {
-        setFormData(prev => ({
-            ...prev,
-            code: String(item.code),
-            description: `${item.code} - ${item.label}`, 
-            value: item.point
-        }));
-        setIsDropdownOpen(false);
-    };
-
-    // EDIT LOGIC
-    const handleEditLog = (log) => {
-        // Penting: Ubah tab tanpa mereset form!
-        if (log.type !== activeTab) {
-            setActiveTab(log.type);
-        }
-        
-        setEditingLogId(log.id);
-        setFormData({
-            code: log.code || '',
-            value: log.value,
-            description: log.description,
-            date: log.date
-        });
-        
-        // Scroll ke atas agar form terlihat
-        const modalContainer = document.getElementById('modal-content-container');
-        if(modalContainer) modalContainer.scrollTop = 0;
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!selectedStudent) return;
-        
-        const payload = {
-            type: activeTab,
-            value: formData.value,
-            description: formData.description,
-            studentId: selectedStudent.id,
-            studentName: selectedStudent.name,
-            class: selectedStudent.class,
-            date: formData.date,
-            code: formData.code 
-        };
-
-        if (editingLogId) {
-            onUpdatePoint({ id: editingLogId, ...payload });
-            alert("Data berhasil diperbarui!");
-        } else {
-            onAddPoint(payload);
-            alert(`${activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'} berhasil dicatat!`);
-        }
-        
-        resetForm();
+        setIsModalOpen(true);
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative">
-            
-            {/* HEADER TAB NAVIGASI */}
+        <div className="flex flex-col h-full bg-slate-50 relative animate-in fade-in">
+            {/* HEADER */}
             <div className="bg-white px-4 pt-4 pb-0 shadow-sm border-b sticky top-0 z-10">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-xl font-bold text-slate-800">Catatan Poin</h1>
@@ -200,294 +66,82 @@ const PointManager = ({ students, pointLogs, masterPoints, sanctionRules, onAddP
                 </div>
 
                 <div className="flex gap-2">
-                    <button 
-                        onClick={() => handleTabChange('violation')}
-                        className={`flex-1 py-3 text-sm font-bold border-b-4 transition-all flex items-center justify-center gap-2 ${
-                            activeTab === 'violation' 
-                            ? 'border-red-500 text-red-600 bg-red-50/50' 
-                            : 'border-transparent text-slate-400 hover:text-slate-600'
-                        }`}
-                    >
+                    <button onClick={() => setActiveTab('violation')} className={`flex-1 py-3 text-sm font-bold border-b-4 transition-all flex items-center justify-center gap-2 ${activeTab === 'violation' ? 'border-red-500 text-red-600 bg-red-50/50' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
                         <AlertTriangle size={18}/> Catat Pelanggaran
                     </button>
-                    <button 
-                        onClick={() => handleTabChange('achievement')}
-                        className={`flex-1 py-3 text-sm font-bold border-b-4 transition-all flex items-center justify-center gap-2 ${
-                            activeTab === 'achievement' 
-                            ? 'border-green-500 text-green-600 bg-green-50/50' 
-                            : 'border-transparent text-slate-400 hover:text-slate-600'
-                        }`}
-                    >
+                    <button onClick={() => setActiveTab('achievement')} className={`flex-1 py-3 text-sm font-bold border-b-4 transition-all flex items-center justify-center gap-2 ${activeTab === 'achievement' ? 'border-green-500 text-green-600 bg-green-50/50' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
                         <Trophy size={18}/> Catat Prestasi
                     </button>
                 </div>
             </div>
 
-            {/* SEARCH BAR SISWA */}
-            <div className="p-4 bg-white border-b border-slate-100 sticky top-[108px] md:top-[115px] z-10">
+            {/* SEARCH BAR */}
+            <div className="p-4 bg-white border-b border-slate-100 sticky top-[108px] z-10">
                 <div className="relative">
                     <Search className="absolute left-3 top-3 text-slate-400" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder={activeTab === 'violation' ? "Cari Siswa untuk Pelanggaran..." : "Cari Siswa Berprestasi..."}
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none focus:ring-2 transition-all ${
-                            activeTab === 'violation' ? 'focus:ring-red-200 border-red-100' : 'focus:ring-green-200 border-green-100'
-                        }`}
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
+                    <input type="text" placeholder={activeTab === 'violation' ? "Cari Siswa untuk Pelanggaran..." : "Cari Siswa Berprestasi..."} className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none focus:ring-2 transition-all ${activeTab === 'violation' ? 'focus:ring-red-200 border-red-100' : 'focus:ring-green-200 border-green-100'}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
                 </div>
             </div>
 
-            {/* LIST SISWA */}
+            {/* LIST SISWA (GRID VIEW) */}
             <div className="flex-1 overflow-y-auto p-4 pb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {filteredStudents.map(student => (
-                        <div 
-                            key={student.id}
-                            onClick={() => handleStudentClick(student)}
-                            className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-transform cursor-pointer flex justify-between items-center relative overflow-hidden"
-                        >
-                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                                student.netScore >= 50 ? 'bg-red-500' : 
-                                student.netScore >= 20 ? 'bg-orange-400' : 'bg-blue-400'
-                            }`}></div>
-
-                            <div className="pl-3">
-                                <h4 className="font-bold text-slate-800">{student.name}</h4>
+                    {paginatedStudents.map(student => (
+                        <div key={student.id} onClick={() => handleStudentClick(student)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-transform cursor-pointer flex justify-between items-center relative overflow-hidden hover:border-blue-300">
+                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${student.netScore >= 50 ? 'bg-red-500' : student.netScore >= 20 ? 'bg-orange-400' : 'bg-blue-400'}`}></div>
+                            <div className="pl-3 overflow-hidden">
+                                <h4 className="font-bold text-slate-800 line-clamp-1">{student.name}</h4>
                                 <p className="text-xs text-slate-500">{student.class} | {student.nisn}</p>
-                                {student.activeSanction && (
-                                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600">
-                                        <AlertOctagon size={10}/> {student.activeSanction.action}
-                                    </span>
-                                )}
+                                {student.activeSanction && <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 line-clamp-1"><AlertOctagon size={10}/> {student.activeSanction.action}</span>}
                             </div>
-
-                            <div className="text-right">
-                                <div className={`text-lg font-black ${
-                                    activeTab === 'violation' ? 'text-red-600' : 'text-green-600'
-                                }`}>
-                                    {activeTab === 'violation' ? student.violationTotal : student.achievementTotal}
-                                </div>
-                                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
-                                    {activeTab === 'violation' ? 'Poin Minus' : 'Poin Plus'}
-                                </div>
+                            <div className="text-right flex-shrink-0 ml-2">
+                                <div className={`text-lg font-black ${activeTab === 'violation' ? 'text-red-600' : 'text-green-600'}`}>{activeTab === 'violation' ? student.violationTotal : student.achievementTotal}</div>
+                                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{activeTab === 'violation' ? 'Poin Minus' : 'Poin Plus'}</div>
                             </div>
-                            
                             <ChevronRight className="text-slate-300 ml-2" size={18}/>
                         </div>
                     ))}
-
-                    {filteredStudents.length === 0 && (
-                        <div className="col-span-full text-center py-10 text-slate-400">
-                            <p className="text-sm">Siswa tidak ditemukan.</p>
-                        </div>
-                    )}
+                    {paginatedStudents.length === 0 && <div className="col-span-full text-center py-10 text-slate-400"><p className="text-sm">Siswa tidak ditemukan.</p></div>}
                 </div>
-            </div>
 
-            {/* --- MODAL INPUT DENGAN SEARCHABLE DROPDOWN --- */}
-            {isInputModalOpen && selectedStudent && (
-                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white w-full md:w-[500px] md:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
-                        
-                        {/* Modal Header */}
-                        <div className={`p-4 border-b flex justify-between items-center ${
-                            activeTab === 'violation' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
-                        } rounded-t-2xl flex-shrink-0`}>
-                            <div>
-                                <h3 className="font-bold text-lg flex items-center gap-2">
-                                    {editingLogId ? <Edit size={20}/> : (activeTab === 'violation' ? <AlertTriangle size={20}/> : <Trophy size={20}/>)}
-                                    {editingLogId ? 'Edit Catatan' : (activeTab === 'violation' ? 'Catat Pelanggaran' : 'Catat Prestasi')}
-                                </h3>
-                                <p className="text-xs opacity-80">{selectedStudent.name} - {selectedStudent.class}</p>
-                            </div>
-                            <button onClick={() => { setIsInputModalOpen(false); resetForm(); }} className="p-2 bg-white/50 rounded-full hover:bg-white/80 transition-colors">
-                                <X size={20}/>
-                            </button>
+                {/* --- PAGINATION CONTROL (Style Data Siswa) --- */}
+                {filteredStudents.length > itemsPerPage && (
+                    <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200 mt-6">
+                        <div className="text-xs text-slate-500 font-medium hidden md:block">
+                            Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredStudents.length)} dari {filteredStudents.length} siswa
                         </div>
-
-                        {/* Modal Body */}
-                        <div id="modal-content-container" className="p-5 overflow-y-auto space-y-5">
-                            
-                            {/* === SEARCHABLE CUSTOM DROPDOWN === */}
-                            <div className="relative" ref={dropdownRef}>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                                    Pilih Jenis {activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'}
-                                </label>
-                                
-                                {/* Trigger Button */}
-                                <div 
-                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className={`w-full p-4 border rounded-xl flex justify-between items-center cursor-pointer transition-all ${
-                                        isDropdownOpen ? 'ring-2 ring-blue-500 border-blue-500' : 'border-slate-300'
-                                    } ${
-                                        activeTab === 'violation' ? 'bg-red-50/30' : 'bg-green-50/30'
-                                    }`}
-                                >
-                                    <span className={`text-sm font-medium ${!formData.code ? 'text-slate-400' : 'text-slate-800'} whitespace-normal break-words line-clamp-2 text-left flex-1 mr-2`}>
-                                        {formData.description || "-- Ketuk untuk memilih --"}
-                                    </span>
-                                    <ChevronDown size={18} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}/>
-                                </div>
-
-                                {/* Dropdown Menu Content */}
-                                {isDropdownOpen && (
-                                    <div className="absolute z-50 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 origin-top flex flex-col max-h-72">
-                                        
-                                        {/* INPUT PENCARIAN DI DALAM DROPDOWN */}
-                                        <div className="p-2 border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
-                                            <div className="relative">
-                                                <Search size={14} className="absolute left-3 top-2.5 text-slate-400"/>
-                                                <input 
-                                                    ref={searchInputRef}
-                                                    type="text" 
-                                                    placeholder="Cari kode atau nama..." 
-                                                    className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 bg-white"
-                                                    value={dropdownSearch}
-                                                    onChange={(e) => setDropdownSearch(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* DAFTAR OPSI (Scrollable) */}
-                                        <div className="overflow-y-auto flex-1">
-                                            {filteredOptions.length > 0 ? (
-                                                filteredOptions.map(opt => (
-                                                    <div 
-                                                        key={opt.id}
-                                                        onClick={() => handleSelectOption(opt)}
-                                                        className={`p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer flex justify-between items-start gap-3 transition-colors ${
-                                                            formData.code === String(opt.code) ? 'bg-blue-50' : ''
-                                                        }`}
-                                                    >
-                                                        <div className="flex-1">
-                                                            <span className="text-[10px] font-bold text-slate-400 block mb-0.5">Kode: {opt.code}</span>
-                                                            <p className="text-sm text-slate-700 leading-snug whitespace-normal break-words">
-                                                                {opt.label}
-                                                            </p>
-                                                        </div>
-                                                        <div className={`font-bold text-sm whitespace-nowrap px-2 py-1 rounded ${
-                                                            activeTab === 'violation' ? 'text-red-600 bg-red-50' : 'text-green-600 bg-green-50'
-                                                        }`}>
-                                                            {opt.point} Poin
-                                                        </div>
-                                                        {formData.code === String(opt.code) && <Check size={16} className="text-blue-500 mt-1"/>}
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div className="p-6 text-center text-slate-400 text-sm italic">
-                                                    Tidak ditemukan "{dropdownSearch}".
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                        <div className="flex gap-2 w-full md:w-auto justify-center md:justify-end">
+                            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 border rounded-lg hover:bg-slate-50 disabled:opacity-50"><ChevronLeft size={16}/></button>
+                            <span className="flex items-center text-xs font-bold bg-slate-50 px-3 rounded-lg md:hidden">Hal {currentPage} / {totalPages}</span>
+                            <div className="hidden md:flex items-center gap-1">
+                                {Array.from({length: Math.min(5, totalPages)}, (_, i) => {
+                                    let pageNum = i + 1;
+                                    if (totalPages > 5 && currentPage > 3) pageNum = currentPage - 3 + i;
+                                    if(pageNum > totalPages) return null;
+                                    return (
+                                        <button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`w-8 h-8 rounded-lg text-xs font-bold ${currentPage === pageNum ? 'bg-blue-600 text-white' : 'bg-slate-50 hover:bg-slate-100'}`}>{pageNum}</button>
+                                    );
+                                })}
                             </div>
-
-                            {/* Detail Input Lainnya */}
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="col-span-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Poin</label>
-                                    <input 
-                                        type="number" 
-                                        className="w-full p-3 border border-slate-300 rounded-lg font-bold text-center outline-none focus:border-blue-500"
-                                        value={formData.value}
-                                        onChange={e => setFormData({...formData, value: e.target.value})}
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-3 text-slate-400" size={16}/>
-                                        <input 
-                                            type="date" 
-                                            className="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-sm"
-                                            value={formData.date}
-                                            onChange={e => setFormData({...formData, date: e.target.value})}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Keterangan Tambahan</label>
-                                <textarea 
-                                    className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:border-blue-500 text-sm h-24 resize-none"
-                                    placeholder={`Detail tambahan untuk ${activeTab === 'violation' ? 'pelanggaran' : 'prestasi'} ini...`}
-                                    value={formData.description}
-                                    onChange={e => setFormData({...formData, description: e.target.value})}
-                                />
-                            </div>
-
-                            {/* History Singkat dengan EDIT & DELETE */}
-                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                <div className="flex justify-between text-xs mb-2">
-                                    <span className="font-bold text-slate-500">Riwayat Terakhir</span>
-                                    <span className="text-slate-400">Total Poin Saat Ini: 
-                                        <b className={`ml-1 ${selectedStudent.netScore > 0 ? 'text-red-600' : selectedStudent.netScore < 0 ? 'text-green-600' : 'text-slate-800'}`}>
-                                            {Math.abs(selectedStudent.netScore)}
-                                        </b>
-                                    </span>
-                                </div>
-                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                    {selectedStudent.logs.map(log => (
-                                        <div key={log.id} className={`text-xs flex justify-between items-start border-b border-slate-200 pb-2 last:border-0 p-2 rounded ${editingLogId === log.id ? 'bg-blue-50 ring-1 ring-blue-300' : 'hover:bg-white'}`}>
-                                            <div className="flex-1 pr-2">
-                                                <span className={`font-bold block mb-0.5 uppercase ${log.type === 'violation' ? 'text-red-600' : 'text-green-600'}`}>
-                                                    {log.type === 'violation' ? 'Pelanggaran' : 'Prestasi'} - {log.value} Poin
-                                                </span>
-                                                <span className="text-slate-600 block line-clamp-2">{log.description}</span>
-                                                <span className="text-slate-400 text-[10px] mt-1 block">{log.date}</span>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <button 
-                                                    onClick={() => handleEditLog(log)} 
-                                                    className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-                                                    title="Edit"
-                                                >
-                                                    <Edit size={14}/>
-                                                </button>
-                                                <button 
-                                                    onClick={() => onDeletePoint(log.id)} 
-                                                    className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200"
-                                                    title="Hapus"
-                                                >
-                                                    <Trash2 size={14}/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {selectedStudent.logs.length === 0 && <p className="text-xs text-slate-400 italic text-center p-4">Belum ada data.</p>}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Modal Footer */}
-                        <div className="p-4 border-t bg-slate-50 rounded-b-2xl flex gap-2">
-                            {editingLogId && (
-                                <button 
-                                    onClick={resetForm}
-                                    className="px-4 py-3.5 rounded-xl bg-slate-200 text-slate-600 font-bold hover:bg-slate-300 transition-colors text-sm"
-                                >
-                                    Batal
-                                </button>
-                            )}
-                            <button 
-                                onClick={handleSubmit}
-                                className={`flex-1 py-3.5 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95 ${
-                                    editingLogId 
-                                        ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'
-                                        : (activeTab === 'violation' ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-green-600 hover:bg-green-700 shadow-green-200')
-                                }`}
-                            >
-                                {editingLogId ? <RefreshCcw size={20}/> : <PlusCircle size={20}/>} 
-                                {editingLogId ? 'Update Perubahan' : `Simpan ${activeTab === 'violation' ? 'Pelanggaran' : 'Prestasi'}`}
-                            </button>
+                            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 border rounded-lg hover:bg-slate-50 disabled:opacity-50"><ChevronRight size={16}/></button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
+
+            {/* MODAL INPUT */}
+            <PointInputModal 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                student={selectedStudent}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                masterPoints={masterPoints}
+                pointLogs={pointLogs}
+                onSubmit={onAddPoint}
+                onUpdate={onUpdatePoint}
+                onDelete={onDeletePoint}
+            />
         </div>
     );
 };
