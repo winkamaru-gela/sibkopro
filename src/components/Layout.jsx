@@ -4,7 +4,7 @@ import {
     Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, 
     X, List, Trophy, Database, ChevronDown, ChevronRight, School,
     BookUser, Album, Gavel, 
-    FileText // <--- GANTI ICON INI SUPAYA LEBIH AMAN DAN TIDAK CRASH
+    ClipboardList, Briefcase 
 } from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogout }) => {
@@ -34,23 +34,45 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
         : [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
             { id: 'journal', label: 'Jurnal Harian', icon: BookOpen },
-            { id: 'students', label: 'Data Siswa', icon: Users },                      
-            { id: 'points', label: 'Catat Poin Siswa', icon: Trophy }, 
-            { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser },
-            { id: 'sanction_book', label: 'Buku Sanksi Siswa', icon: Gavel },
-            { id: 'counseling_history', label: 'Riwayat Konseling', icon: FileText },
+            { id: 'students', label: 'Data Siswa', icon: Users },
+            
+            // --- GROUP LAYANAN BK ---
+            { 
+                id: 'bk_services', 
+                label: 'Layanan BK', 
+                icon: Briefcase, 
+                children: [
+                    { id: 'points', label: 'Catat Poin Siswa', icon: Trophy }, 
+                    { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser },
+                    { id: 'sanction_book', label: 'Buku Sanksi Siswa', icon: Gavel },
+                    { id: 'counseling_history', label: 'Riwayat Konseling', icon: ClipboardList },
+                ]
+            },
+            
             { id: 'reports', label: 'Cetak Laporan', icon: Printer },
             
+            // --- GROUP MASTER DATA (Sisa Data Poin) ---
             { 
                 id: 'master_group', 
                 label: 'Master Data', 
                 icon: Database,
                 children: [
                     { id: 'master_points', label: 'Data Poin', icon: List },
-                    { id: 'settings', label: 'Pengaturan Sekolah', icon: School }
+                    // Pengaturan Sekolah dipindahkan dari sini
                 ]
             },
-            { id: 'account', label: 'Akun Saya', icon: UserCog }
+
+            // --- GROUP BARU: PENGATURAN ---
+            {
+                id: 'settings_group',
+                label: 'Pengaturan',
+                icon: Settings, // Icon Gerigi
+                children: [
+                    { id: 'settings', label: 'Informasi Sekolah', icon: School },
+                    { id: 'account', label: 'Password Guru', icon: UserCog } // Profil Saya digabung ke sini
+                ]
+            }
+            // ------------------------------
           ];
 
     const handleMenuClick = (item) => {
