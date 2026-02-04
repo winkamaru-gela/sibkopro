@@ -453,7 +453,7 @@ const BookContent = ({ student, counselingHistory, settings, isPrintVersion = fa
             {/* RIWAYAT LAYANAN */}
             <div className="mb-8">
                 <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-blue-800">
-                    <FileText size={16}/> C. Daftar Layanan
+                    <FileText size={16}/> Riwayat Layanan Bimbingan Konseling
                 </h3>
                 {privacyMode === 'mask' && (
                     <p className="text-[10px] italic mb-2 text-slate-500">*Topik layanan yang bersifat privasi disamarkan pada dokumen ini.</p>
