@@ -23,6 +23,7 @@ import PointManager from './pages/PointManager';
 import MasterDataSettings from './pages/MasterDataSettings'; 
 import StudentPointBook from './pages/StudentPointBook';
 import SanctionBook from './pages/SanctionBook';
+import CounselingHistory from './pages/CounselingHistory'; // <--- IMPORT BARU
 
 export default function App() {
     const [authUser, setAuthUser] = useState(null); 
@@ -75,7 +76,6 @@ export default function App() {
         // Kita menggunakan ID Guru (appUser.id) sebagai kunci utama.
         
         // A. Fetch Students (Hanya milik guru ini)
-        // Kita gunakan query 'where' agar lebih efisien di Firestore, atau filter di klien
         const qStudents = query(getCollectionRef(COLLECTION_PATHS.students), where("teacherId", "==", appUser.id));
         const unsubStudents = onSnapshot(qStudents, snap => {
             let data = snap.docs.map(d => ({id: d.id, ...d.data()}));
@@ -90,11 +90,9 @@ export default function App() {
         });
 
         // C. Fetch Settings (PENGATURAN SEKOLAH PRIBADI GURU)
-        // Guru memiliki pengaturan sekolah masing-masing (Kop surat, nama sekolah sendiri)
         const qSettings = query(getCollectionRef(COLLECTION_PATHS.settings), where("teacherId", "==", appUser.id));
         const unsubSettings = onSnapshot(qSettings, snap => {
             if(!snap.empty) {
-                // Ambil dokumen pertama yang ditemukan milik guru ini
                 setMySettings({id: snap.docs[0].id, ...snap.docs[0].data()});
             } else {
                 setMySettings({});
@@ -109,7 +107,6 @@ export default function App() {
         });
 
         // E. Fetch Master Data Points (ISOLASI: Simpan dengan ID Guru)
-        // Dokumen disimpan di collection 'settings' dengan ID unik: master_points_IDGURU
         const unsubMaster = onSnapshot(doc(db, 'settings', `master_points_${appUser.id}`), (docSnap) => {
             if (docSnap.exists()) setMasterPoints(docSnap.data().items || []);
             else setMasterPoints([]);
@@ -134,7 +131,6 @@ export default function App() {
         setTimeout(() => {
             const user = allUsers.find(x => x.username === u && x.password === p);
             if (user) {
-                // Cek masa aktif (Opsional: Jika Anda menghapus fitur masa aktif di Admin, bagian ini bisa dihapus)
                 if (user.accessExpiry && new Date(user.accessExpiry) < new Date()) {
                     setLoginError('Masa aktif akun telah habis. Hubungi Admin.');
                 } else {
@@ -175,7 +171,7 @@ export default function App() {
     const addStudent = async (data) => {
         await addDoc(getCollectionRef(COLLECTION_PATHS.students), { 
             ...data, 
-            teacherId: appUser.id, // Kunci utama kepemilikan
+            teacherId: appUser.id, 
             createdAt: new Date().toISOString() 
         });
     };
@@ -185,7 +181,6 @@ export default function App() {
             const batch = writeBatch(db);
             studentList.forEach(student => {
                 const docRef = doc(collection(db, COLLECTION_PATHS.students));
-                // Pastikan teacherId terisi
                 batch.set(docRef, { 
                     ...student, 
                     teacherId: appUser.id, 
@@ -214,7 +209,6 @@ export default function App() {
     };
 
     const saveSettings = async (data) => {
-        // Simpan setting dengan menautkannya ke teacherId
         if (mySettings.id) {
             await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.settings), mySettings.id), data);
         } else {
@@ -254,7 +248,6 @@ export default function App() {
     };
 
     const saveMasterPoints = async (newItems) => {
-        // Simpan ke dokumen khusus milik guru ini
         try {
             await setDoc(doc(db, 'settings', `master_points_${appUser.id}`), { items: newItems });
             alert("Master data poin sekolah berhasil disimpan!");
@@ -262,7 +255,6 @@ export default function App() {
     };
 
     const saveSanctionRules = async (newItems) => {
-        // Simpan ke dokumen khusus milik guru ini
         try {
             await setDoc(doc(db, 'settings', `sanction_rules_${appUser.id}`), { items: newItems });
             alert("Aturan sanksi berhasil disimpan!");
@@ -316,6 +308,17 @@ export default function App() {
                         />
                     )}
                     
+                    {/* --- MENU BARU: RIWAYAT LAYANAN KONSELING --- */}
+                    {activeTab === 'counseling_history' && (
+                        <CounselingHistory 
+                            students={students} 
+                            journals={journals}
+                            settings={mySettings}
+                            user={appUser}
+                        />
+                    )}
+                    {/* ------------------------------------------- */}
+
                     {activeTab === 'points' && (
                         <PointManager 
                             students={students} 
@@ -337,7 +340,7 @@ export default function App() {
                             sanctionRules={sanctionRules}
                         />
                     )}
-                   
+                           
                    {activeTab === 'sanction_book' && (
                         <SanctionBook 
                             students={students}

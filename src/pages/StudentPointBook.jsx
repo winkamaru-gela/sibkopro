@@ -1,14 +1,15 @@
+// src/pages/StudentPointBook.jsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-    Search, Printer, Shield, ShieldAlert, 
+    Search, Printer, ShieldAlert, 
     BookOpen, History, Award, X, ChevronDown, AlertTriangle, Trophy,
-    FileText, Download, ListOrdered
+    FileText, ListOrdered, Lock, Eye, EyeOff, Trash2, CheckSquare, Square
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 
 // ==========================================
-// 1. KOMPONEN PORTAL CETAK (FIXED PRINT STYLE)
+// 1. KOMPONEN PORTAL CETAK
 // ==========================================
 const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
@@ -19,49 +20,12 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
             {/* --- CSS ISOLASI CETAK --- */}
             <style>{`
                 @media print {
-                    /* 1. SETUP KERTAS */
                     @page { size: auto; margin: 10mm; }
-
-                    /* 2. SEMBUNYIKAN APLIKASI UTAMA */
-                    #root, .app-container, header, aside, nav { 
-                        display: none !important; 
-                    }
-                    
-                    /* 3. RESET BODY AGAR TIDAK TERKUNCI */
-                    html, body { 
-                        height: auto !important; 
-                        overflow: visible !important; 
-                        background-color: white !important; 
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-
-                    /* 4. TAMPILKAN MODAL INI SEBAGAI KONTEN UTAMA */
-                    .print-portal-root { 
-                        display: block !important; 
-                        position: absolute !important; 
-                        top: 0 !important; 
-                        left: 0 !important; 
-                        width: 100% !important; 
-                        height: auto !important;
-                        z-index: 9999 !important;
-                        background-color: white !important;
-                    }
-
-                    /* 5. BERSIHKAN TAMPILAN KERTAS */
-                    .print-paper-content {
-                        box-shadow: none !important;
-                        border: none !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        width: 100% !important;
-                        max-width: none !important;
-                    }
-
-                    /* 6. SEMBUNYIKAN TOMBOL HEADER MODAL */
+                    #root, .app-container, header, aside, nav { display: none !important; }
+                    html, body { height: auto !important; overflow: visible !important; background-color: white !important; margin: 0 !important; }
+                    .print-portal-root { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; z-index: 9999 !important; background-color: white !important; }
+                    .print-paper-content { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
                     .print-header-actions { display: none !important; }
-
-                    /* 7. HANDLING PAGE BREAK */
                     table { width: 100% !important; border-collapse: collapse !important; }
                     tr { page-break-inside: avoid; }
                     td, th { border: 1px solid black !important; padding: 4px; color: black !important; }
@@ -112,12 +76,15 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchRef = useRef(null);
 
-    // --- FITUR PRIVASI & OPSI CETAK ---
-    const [privacyMode, setPrivacyMode] = useState({
-        hideCounseling: false, 
-        maskDescription: true, // Default aktif
-        showSanctionHistory: false 
-    });
+    // --- OPSI TAMPILAN (TOGGLE SECTIONS) ---
+    const [showSanctionHistory, setShowSanctionHistory] = useState(false); // Default OFF
+    const [showCounselingHistory, setShowCounselingHistory] = useState(true); // Default ON
+
+    // --- MODE PRIVASI LAYANAN BK (3 OPSI) ---
+    // 'show' = Tampilkan Semua
+    // 'mask' = Samarkan Topik (Default)
+    // 'hide' = Sembunyikan Baris Privasi
+    const [counselingPrivacy, setCounselingPrivacy] = useState('mask');
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -140,6 +107,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
 
     const student = useMemo(() => students.find(s => s.id === selectedStudentId), [students, selectedStudentId]);
 
+    // Data Poin
     const pointData = useMemo(() => {
         if (!student) return null;
         const logs = pointLogs.filter(p => p.studentId === student.id).sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -153,12 +121,23 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         return { logs, violationTotal, achievementTotal, netScoreRaw, activeSanction };
     }, [student, pointLogs, sanctionRules]);
 
+    // Data Konseling (Filter sesuai Mode 'Hide')
     const counselingHistory = useMemo(() => {
         if (!student) return [];
-        return journals.filter(j => 
+        let data = journals.filter(j => 
             j.studentId === student.id || (j.studentIds && j.studentIds.includes(student.id))
         ).sort((a,b) => b.date.localeCompare(a.date));
-    }, [student, journals]);
+
+        // Jika Mode Hide: Buang data yang privasi
+        if (counselingPrivacy === 'hide') {
+            data = data.filter(j => {
+                const isPrivate = j.isPrivate || (j.serviceType && j.serviceType.toLowerCase().includes('pribadi'));
+                return !isPrivate;
+            });
+        }
+
+        return data;
+    }, [student, journals, counselingPrivacy]);
 
     const handleSelectStudent = (s) => {
         setSelectedStudentId(s.id);
@@ -172,7 +151,6 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
 
         const { violationTotal, achievementTotal, netScoreRaw, activeSanction, logs } = pointData;
         const displayScore = Math.abs(netScoreRaw);
-        
         const isDeficit = violationTotal > achievementTotal;
         const isSurplus = achievementTotal > violationTotal;
         const scoreColor = isDeficit ? 'red' : (isSurplus ? 'green' : 'black');
@@ -180,9 +158,9 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         const violationLogs = logs.filter(l => l.type === 'violation');
         const achievementLogs = logs.filter(l => l.type === 'achievement');
 
-        // LOGIKA RIWAYAT SANKSI (KRONOLOGIS)
+        // TABEL SANKSI (WORD)
         let historyTableHTML = '';
-        if (privacyMode.showSanctionHistory) {
+        if (showSanctionHistory) {
             const sortedLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date)); 
             let runningBalance = 0;
             const historyRows = sortedLogs.map((log, idx) => {
@@ -228,35 +206,61 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
             `;
         }
 
-        // GENERATE WORD: LOGIKA TABEL LAYANAN BARU (KLASIFIKASI vs KONTEN)
-        const counselingRows = counselingHistory.map((h, i) => {
-            const isHidden = privacyMode.maskDescription && h.isPrivate;
-            const descText = isHidden ? '--- Privasi (Topik Disamarkan) ---' : h.description;
+        // TABEL KONSELING (WORD)
+        let counselingTableHTML = '';
+        if (showCounselingHistory) {
+            const counselingRows = counselingHistory.map((h, i) => {
+                const isPrivate = h.isPrivate || (h.serviceType && h.serviceType.toLowerCase().includes('pribadi'));
+                const isMasked = isPrivate && counselingPrivacy === 'mask';
+                const descText = isMasked ? '--- Privasi (Disamarkan) ---' : h.description;
+                const textStyle = isMasked ? 'font-style: italic; color: #666;' : '';
+                
+                return `
+                    <tr>
+                        <td style="border: 1px solid black; padding: 5px; text-align: center;">${i+1}</td>
+                        <td style="border: 1px solid black; padding: 5px; text-align: center;">${formatIndoDate(h.date)}</td>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top;">
+                            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 4px;">
+                                ${h.serviceType}
+                            </div>
+                            <div style="font-size: 11px;">
+                                <b>Bidang:</b> ${h.skkpd || '-'}<br/>
+                                <b>Kategori:</b> ${h.category || '-'}<br/>
+                                <b>Teknik:</b> ${h.technique || '-'}
+                            </div>
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top; ${textStyle}">
+                            ${descText}
+                        </td>
+                        <td style="border: 1px solid black; padding: 5px; vertical-align: top;">${h.followUp}</td>
+                    </tr>
+                `;
+            }).join('');
             
-            return `
-                <tr>
-                    <td style="border: 1px solid black; padding: 5px; text-align: center;">${i+1}</td>
-                    <td style="border: 1px solid black; padding: 5px; text-align: center;">${formatIndoDate(h.date)}</td>
-                    
-                    <td style="border: 1px solid black; padding: 5px; vertical-align: top;">
-                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 4px;">
-                            ${h.serviceType}
-                        </div>
-                        <div style="font-size: 11px;">
-                            <b>Bidang:</b> ${h.skkpd || '-'}<br/>
-                            <b>Kategori:</b> ${h.category || '-'}<br/>
-                            <b>Teknik:</b> ${h.technique || '-'}
-                        </div>
-                    </td>
+            // Info text jika mode mask/hide
+            let infoText = '';
+            if (counselingPrivacy === 'mask') infoText = '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>';
+            if (counselingPrivacy === 'hide') infoText = '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Layanan yang bersifat privasi tidak ditampilkan pada dokumen ini.</p>';
 
-                    <td style="border: 1px solid black; padding: 5px; vertical-align: top; font-style: ${isHidden ? 'italic' : 'normal'}; color: ${isHidden ? '#666' : '#000'};">
-                        ${descText}
-                    </td>
-
-                    <td style="border: 1px solid black; padding: 5px; vertical-align: top;">${h.followUp}</td>
-                </tr>
+            counselingTableHTML = `
+                <h4 style="margin-bottom: 5px; color: #1e40af;">C. RIWAYAT LAYANAN BK</h4>
+                ${infoText}
+                <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 30px;">No</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 80px;">Tanggal</th>
+                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 180px;">Jenis & Detail Layanan</th> 
+                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold;">Topik / Masalah</th> 
+                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 100px;">Tindak Lanjut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${counselingRows || '<tr><td colspan="5" style="border: 1px solid black; padding: 5px; text-align: center; font-style: italic;">Belum ada riwayat layanan.</td></tr>'}
+                    </tbody>
+                </table>
             `;
-        }).join('');
+        }
 
         const tableStyle = `border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;`;
         const thStyle = `border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold;`;
@@ -353,22 +357,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                     </tbody>
                 </table>
 
-                ${!privacyMode.hideCounseling ? `
-                    <h4 style="margin-bottom: 5px; color: #1e40af;">C. RIWAYAT LAYANAN BK</h4>
-                    ${privacyMode.maskDescription ? '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>' : ''}
-                    <table style="${tableStyle}">
-                        <thead>
-                            <tr>
-                                <th style="${thStyle} width: 30px;">No</th>
-                                <th style="${thStyle} width: 80px;">Tanggal</th>
-                                <th style="${thStyle} width: 180px;">Jenis & Detail Layanan</th> <th style="${thStyle}">Topik / Masalah</th> <th style="${thStyle} width: 100px;">Tindak Lanjut</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${counselingRows || `<tr><td colspan="5" style="${tdStyle} ${centerTd} font-style: italic;">Belum ada riwayat layanan.</td></tr>`}
-                        </tbody>
-                    </table>
-                ` : ''}
+                ${counselingTableHTML}
 
                 <br/><br/>
                 <table style="width: 100%; border: none;">
@@ -475,28 +464,68 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
             <div className="flex-1 overflow-y-auto p-4 md:p-8">
                 {student && pointData ? (
                     <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                        {/* Kontrol Privasi */}
-                        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                        
+                        {/* KONTROL DOKUMEN & PRIVASI */}
+                        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <div className="bg-yellow-100 p-2 rounded-full text-yellow-700"><ShieldAlert size={20}/></div>
                                 <div>
-                                    <h4 className="font-bold text-slate-800 text-sm">Kontrol Dokumen & Privasi</h4>
-                                    <p className="text-xs text-slate-500">Atur informasi yang ditampilkan saat dicetak atau didownload.</p>
+                                    <h4 className="font-bold text-slate-800 text-sm">Opsi Dokumen & Privasi</h4>
+                                    <p className="text-xs text-slate-500">Sesuaikan kelengkapan data sebelum mencetak.</p>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
-                                    <input type="checkbox" className="w-4 h-4 accent-orange-600" checked={privacyMode.showSanctionHistory} onChange={e => setPrivacyMode({...privacyMode, showSanctionHistory: e.target.checked})} />
-                                    <span className="text-xs font-bold text-slate-700">Tampilkan Riwayat Sanksi</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
-                                    <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={privacyMode.maskDescription} onChange={e => setPrivacyMode({...privacyMode, maskDescription: e.target.checked})} />
-                                    <span className="text-xs font-bold text-slate-700">Samarkan Topik</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-2 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
-                                    <input type="checkbox" className="w-4 h-4 accent-red-600" checked={privacyMode.hideCounseling} onChange={e => setPrivacyMode({...privacyMode, hideCounseling: e.target.checked})} />
-                                    <span className="text-xs font-bold text-slate-700">Sembunyikan BK</span>
-                                </label>
+                            
+                            <div className="flex flex-col gap-3">
+                                {/* BARIS 1: TOGGLE BAGIAN UTAMA */}
+                                <div className="flex flex-wrap gap-4">
+                                    {/* Toggle Riwayat Sanksi */}
+                                    <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-lg border border-yellow-100 shadow-sm">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 accent-orange-600 rounded" 
+                                            checked={showSanctionHistory} 
+                                            onChange={e => setShowSanctionHistory(e.target.checked)} 
+                                        />
+                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                            <ListOrdered size={14}/> Sertakan Riwayat Sanksi
+                                        </span>
+                                    </label>
+
+                                    {/* Toggle Riwayat BK */}
+                                    <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-lg border border-yellow-100 shadow-sm">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 accent-blue-600 rounded" 
+                                            checked={showCounselingHistory} 
+                                            onChange={e => setShowCounselingHistory(e.target.checked)} 
+                                        />
+                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                            <FileText size={14}/> Sertakan Riwayat BK
+                                        </span>
+                                    </label>
+                                </div>
+
+                                {/* BARIS 2: OPSI PRIVASI BK (Hanya Muncul Jika BK Dicawang) */}
+                                {showCounselingHistory && (
+                                    <div className="flex flex-col sm:flex-row gap-2 pl-2 border-l-2 border-slate-300 animate-in fade-in slide-in-from-top-1">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase self-center mr-2">Mode Privasi BK:</span>
+                                        
+                                        <label className={`flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded border transition-all ${counselingPrivacy === 'show' ? 'bg-blue-100 border-blue-300' : 'bg-white border-slate-200'}`}>
+                                            <input type="radio" name="cp_mode_main" className="w-3 h-3 accent-blue-600" checked={counselingPrivacy === 'show'} onChange={() => setCounselingPrivacy('show')} />
+                                            <div className="text-[11px] font-bold flex gap-1 items-center"><Eye size={12}/> Tampilkan</div>
+                                        </label>
+                                        
+                                        <label className={`flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded border transition-all ${counselingPrivacy === 'mask' ? 'bg-blue-100 border-blue-300' : 'bg-white border-slate-200'}`}>
+                                            <input type="radio" name="cp_mode_main" className="w-3 h-3 accent-blue-600" checked={counselingPrivacy === 'mask'} onChange={() => setCounselingPrivacy('mask')} />
+                                            <div className="text-[11px] font-bold flex gap-1 items-center"><EyeOff size={12}/> Samarkan</div>
+                                        </label>
+                                        
+                                        <label className={`flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded border transition-all ${counselingPrivacy === 'hide' ? 'bg-blue-100 border-blue-300' : 'bg-white border-slate-200'}`}>
+                                            <input type="radio" name="cp_mode_main" className="w-3 h-3 accent-blue-600" checked={counselingPrivacy === 'hide'} onChange={() => setCounselingPrivacy('hide')} />
+                                            <div className="text-[11px] font-bold flex gap-1 items-center"><Trash2 size={12}/> Sembunyikan Baris</div>
+                                        </label>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -507,7 +536,9 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                                 pointData={pointData} 
                                 counselingHistory={counselingHistory} 
                                 settings={settings}
-                                privacyMode={privacyMode} 
+                                counselingPrivacy={counselingPrivacy}
+                                showSanctionHistory={showSanctionHistory}
+                                showCounselingHistory={showCounselingHistory} // Pass state ini
                                 sanctionRules={sanctionRules}
                             />
                         </div>
@@ -532,7 +563,9 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                         pointData={pointData} 
                         counselingHistory={counselingHistory} 
                         settings={settings}
-                        privacyMode={privacyMode} 
+                        counselingPrivacy={counselingPrivacy}
+                        showSanctionHistory={showSanctionHistory}
+                        showCounselingHistory={showCounselingHistory} // Pass state ini
                         sanctionRules={sanctionRules}
                         isPrintVersion={true}
                     />
@@ -546,7 +579,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
 // ==========================================
 // 3. SUB-KOMPONEN: ISI BUKU (DOKUMEN HTML)
 // ==========================================
-const BookContent = ({ student, pointData, counselingHistory, settings, privacyMode, sanctionRules, isPrintVersion = false }) => {
+const BookContent = ({ student, pointData, counselingHistory, settings, counselingPrivacy, showSanctionHistory, showCounselingHistory, sanctionRules, isPrintVersion = false }) => {
     const { violationTotal, achievementTotal, netScoreRaw, activeSanction, logs } = pointData;
 
     const violationLogs = logs.filter(l => l.type === 'violation');
@@ -559,8 +592,7 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
 
     // LOGIKA RIWAYAT SANKSI (KRONOLOGIS)
     const sanctionHistoryRows = useMemo(() => {
-        if (!privacyMode.showSanctionHistory) return [];
-        // Clone & Reverse agar urut dari lama ke baru (Kronologis)
+        if (!showSanctionHistory) return [];
         const chronologicalLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date));
         
         let runningBalance = 0;
@@ -582,7 +614,7 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 status: rule ? rule.penalty : '-'
             };
         });
-    }, [logs, privacyMode.showSanctionHistory, sanctionRules]);
+    }, [logs, showSanctionHistory, sanctionRules]);
 
     return (
         <div className={`text-slate-900 ${isPrintVersion ? 'text-sm' : 'p-8'}`}>
@@ -636,7 +668,7 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </tbody>
             </table>
 
-            {/* RINGKASAN POIN (TAMPILAN KOMPAK & RAPI) */}
+            {/* RINGKASAN POIN */}
             <table className="w-full border-collapse border border-black mb-6 text-center text-sm">
                 <thead>
                     <tr className="bg-gray-100">
@@ -656,7 +688,7 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </tbody>
             </table>
 
-            {/* KETENTUAN SANKSI (JIKA MINUS) */}
+            {/* KETENTUAN SANKSI */}
             {isDeficit && activeSanction && (
                 <div className="mb-8">
                     <h3 className="font-bold text-sm uppercase mb-2 text-red-700">Tindak Lanjut & Sanksi Saat Ini</h3>
@@ -679,8 +711,8 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </div>
             )}
 
-            {/* TABEL RIWAYAT SANKSI (OPSIONAL) - DIMUNCULKAN DI ATAS TABEL PELANGGARAN */}
-            {privacyMode.showSanctionHistory && (
+            {/* RIWAYAT SANKSI (OPSIONAL) */}
+            {showSanctionHistory && (
                 <div className="mb-8 animate-in fade-in slide-in-from-top-2">
                     <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-amber-700">
                         <ListOrdered size={16}/> Riwayat Perubahan Poin & Status Sanksi
@@ -719,7 +751,7 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </div>
             )}
 
-            {/* CATATAN PELANGGARAN */}
+            {/* A. CATATAN PELANGGARAN */}
             <div className="mb-6">
                 <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-red-700">
                     <AlertTriangle size={16}/> A. Catatan Pelanggaran
@@ -748,7 +780,7 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </table>
             </div>
 
-            {/* CATATAN PRESTASI */}
+            {/* B. CATATAN PRESTASI */}
             <div className="mb-6">
                 <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-green-700">
                     <Trophy size={16}/> B. Catatan Prestasi
@@ -777,15 +809,21 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                 </table>
             </div>
 
-            {/* RIWAYAT LAYANAN */}
-            {!privacyMode.hideCounseling && (
+            {/* C. RIWAYAT LAYANAN BK (OPSIONAL) */}
+            {showCounselingHistory && (
                 <div className="mb-8">
                     <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-blue-800">
-                        <Shield size={16}/> C. Riwayat Layanan Bimbingan Konseling
+                        <FileText size={16}/> C. Riwayat Layanan Bimbingan Konseling
                     </h3>
-                    {privacyMode.maskDescription && (
+                    
+                    {/* INFO MODE PRIVASI */}
+                    {counselingPrivacy === 'mask' && (
                         <p className="text-[10px] italic mb-2 text-slate-500">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>
                     )}
+                    {counselingPrivacy === 'hide' && (
+                        <p className="text-[10px] italic mb-2 text-slate-500">*Layanan yang bersifat privasi tidak ditampilkan pada dokumen ini.</p>
+                    )}
+                    
                     <table className="w-full border-collapse border border-black text-xs">
                         <thead>
                             <tr className="bg-slate-100 text-center">
@@ -796,8 +834,10 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                         </thead>
                         <tbody>
                             {counselingHistory.length > 0 ? counselingHistory.map((h, i) => {
-                                // LOGIKA BARU: HANYA SEMBUNYIKAN JIKA (FITUR AKTIF && DATA PRIVATE)
-                                const isHidden = privacyMode.maskDescription && h.isPrivate;
+                                // LOGIKA TAMPILAN PRIVASI
+                                const isPrivate = h.isPrivate || (h.serviceType && h.serviceType.toLowerCase().includes('pribadi'));
+                                const isMasked = isPrivate && counselingPrivacy === 'mask';
+                                
                                 return (
                                     <tr key={h.id}>
                                         <td className="border border-black p-1.5 text-center">{i+1}</td>
@@ -805,7 +845,11 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                                         
                                         {/* KOLOM GABUNGAN (JENIS LAYANAN & DETAIL) */}
                                         <td className="border border-black p-1.5 text-left align-top">
-                                            <div className="font-bold underline mb-1">{h.serviceType}</div>
+                                            <div className="font-bold underline mb-1 flex items-center gap-1">
+                                                {h.serviceType}
+                                                {/* Indikator gembok jika privasi */}
+                                                {isPrivate && <Lock size={10} className="text-red-500" />}
+                                            </div>
                                             <div className="text-[10px] space-y-1">
                                                 <div><span className="font-bold">Bidang:</span> {h.skkpd || '-'}</div>
                                                 <div><span className="font-bold">Kategori:</span> {h.category || '-'}</div>
@@ -813,10 +857,10 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                                             </div>
                                         </td>
 
-                                        {/* KOLOM TOPIK (BERDIRI SENDIRI DENGAN PRIVASI) */}
+                                        {/* KOLOM TOPIK (MASKING) */}
                                         <td className="border border-black p-1.5 text-left align-top">
-                                            <div className={`text-sm ${isHidden ? 'italic text-gray-400' : ''}`}>
-                                                {isHidden ? '-- Privasi (Disamarkan) --' : h.description}
+                                            <div className={`text-sm ${isMasked ? 'italic text-gray-400' : ''}`}>
+                                                {isMasked ? '--- Privasi (Disamarkan) ---' : h.description}
                                             </div>
                                         </td>
 
@@ -824,7 +868,12 @@ const BookContent = ({ student, pointData, counselingHistory, settings, privacyM
                                     </tr>
                                 );
                             }) : (
-                                <tr><td colSpan="5" className="border border-black p-4 text-center italic">Belum ada riwayat layanan.</td></tr>
+                                <tr><td colSpan="5" className="border border-black p-4 text-center italic">
+                                    {counselingPrivacy === 'hide' && counselingHistory.length === 0 
+                                        ? "Belum ada riwayat layanan publik (data privasi disembunyikan)."
+                                        : "Belum ada riwayat layanan."
+                                    }
+                                </td></tr>
                             )}
                         </tbody>
                     </table>

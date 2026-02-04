@@ -1,8 +1,10 @@
+// src/components/Layout.jsx
 import React, { useState, useEffect } from 'react';
 import { 
     Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, 
     X, List, Trophy, Database, ChevronDown, ChevronRight, School,
-    BookUser, Gavel // Tambahkan Import Gavel (Ikon Palu)
+    BookUser, Album, Gavel, 
+    FileText // <--- GANTI ICON INI SUPAYA LEBIH AMAN DAN TIDAK CRASH
 } from 'lucide-react';
 
 const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogout }) => {
@@ -31,26 +33,14 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
           ]
         : [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
-            
-            // 1. Jurnal Harian
             { id: 'journal', label: 'Jurnal Harian', icon: BookOpen },
-            
-            // 2. Data Siswa
-            { id: 'students', label: 'Data Siswa', icon: Users },
-            
-            // 3. Menu Operasional Poin
+            { id: 'students', label: 'Data Siswa', icon: Users },                      
             { id: 'points', label: 'Catat Poin Siswa', icon: Trophy }, 
-            
-            // 4. Buku Poin Siswa
             { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser },
-
-            // 5. Buku Sanksi (MENU BARU)
             { id: 'sanction_book', label: 'Buku Sanksi Siswa', icon: Gavel },
-
-            // 6. Menu Laporan
+            { id: 'counseling_history', label: 'Riwayat Konseling', icon: FileText },
             { id: 'reports', label: 'Cetak Laporan', icon: Printer },
-
-            // 7. Master Data (Group)
+            
             { 
                 id: 'master_group', 
                 label: 'Master Data', 
@@ -60,7 +50,6 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                     { id: 'settings', label: 'Pengaturan Sekolah', icon: School }
                 ]
             },
-            
             { id: 'account', label: 'Akun Saya', icon: UserCog }
           ];
 
@@ -89,7 +78,6 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
 
     return (
         <div className="flex h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden print:bg-white print:h-auto">
-            {/* Overlay Mobile */}
             {sidebarOpen && (
                 <div 
                     className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
@@ -97,7 +85,6 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                 />
             )}
 
-            {/* Sidebar */}
             <aside className={`
                 bg-slate-900 text-white flex flex-col 
                 fixed inset-y-0 left-0 z-50 h-full w-64
@@ -124,7 +111,6 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                 <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
                     {menuItems.map(item => (
                         <div key={item.id}>
-                            {/* ITEM MENU UTAMA */}
                             <button
                                 onClick={() => handleMenuClick(item)}
                                 className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
@@ -140,13 +126,11 @@ const Layout = ({ children, activeTab, setActiveTab, userRole, userName, onLogou
                                         <span className="ml-3 font-medium text-sm whitespace-nowrap">{item.label}</span>
                                     )}
                                 </div>
-                                {/* Icon Panah untuk Dropdown */}
                                 {item.children && (sidebarOpen || window.innerWidth < 768) && (
                                     expandedMenu === item.id ? <ChevronDown size={16}/> : <ChevronRight size={16}/>
                                 )}
                             </button>
 
-                            {/* SUBMENU (CHILDREN) */}
                             {item.children && expandedMenu === item.id && (sidebarOpen || window.innerWidth < 768) && (
                                 <div className="ml-4 mt-1 space-y-1 border-l border-slate-700 pl-2 animate-in slide-in-from-left-2 duration-200">
                                     {item.children.map(child => (
