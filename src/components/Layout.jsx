@@ -56,6 +56,7 @@ const Layout = ({ children, userRole, userName, onLogout }) => {
                     { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser, path: '/point-book' },
                     { id: 'sanction_book', label: 'Buku Sanksi Siswa', icon: Gavel, path: '/sanction-book' },
                     { id: 'counseling_history', label: 'Riwayat Konseling', icon: ClipboardList, path: '/counseling-history' },
+                    { id: 'letters', label: 'Pembuatan Surat', icon: Mail, path: '/letters' },
                 ]
             },
             

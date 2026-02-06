@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // <--- [UBAH 1] Import useNavigate
 import { 
     Gavel, Search, ChevronDown, Printer, AlertTriangle, 
     ChevronLeft, ChevronRight, Filter, Check, FileText 
 } from 'lucide-react';
-import SanctionLetterModal from '../components/sanctions/SanctionLetterModal';
+// [UBAH 2] Hapus import SanctionLetterModal karena digantikan redirect
 import SanctionDetailModal from '../components/sanctions/SanctionDetailModal';
 
 const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
+    const navigate = useNavigate(); // <--- [UBAH 3] Inisialisasi navigate
+
     // --- STATE UI ---
     const [searchTerm, setSearchTerm] = useState('');
     const [filterClass, setFilterClass] = useState('');
@@ -17,7 +20,7 @@ const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
 
     // Modal State
     const [selectedStudent, setSelectedStudent] = useState(null);
-    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    // [UBAH 4] Hapus state isPrintModalOpen
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false); 
 
     // Pagination State
@@ -73,18 +76,26 @@ const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
-    // Helper Label Filter (Gunakan PENALTY)
     const getSelectedFilterLabel = () => {
         if (!filterRuleId) return "Semua Jenis Sanksi";
         const rule = sanctionRules.find(r => String(r.id) === String(filterRuleId));
-        // PERBAIKAN: Gunakan 'penalty' (Kolom Sanksi)
         return rule ? (rule.penalty || rule.action) : "Filter Sanksi";
     };
 
     // --- HANDLERS ---
-    const handleOpenPrint = (student) => {
-        setSelectedStudent(student);
-        setIsPrintModalOpen(true);
+    
+    // [UBAH 5] Fungsi Baru: Redirect ke LetterManager
+    const handleProcessLetter = (student) => {
+        // Ambil nama sanksi (misal "SP1") untuk mencoba menebak template
+        const sanctionName = student.activeRule?.penalty || student.activeRule?.action || '';
+        
+        // Pindah ke halaman /letters membawa data di 'state'
+        navigate('/letters', { 
+            state: { 
+                preSelectedStudentId: student.id,
+                suggestedTemplateKeyword: sanctionName
+            } 
+        });
     };
 
     const handleOpenDetail = (student) => {
@@ -130,7 +141,6 @@ const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
                                         <div key={rule.id} onClick={() => { setFilterRuleId(rule.id); setIsFilterDropdownOpen(false); }} className={`p-3 border-b border-slate-50 hover:bg-orange-50 cursor-pointer flex justify-between items-center transition-colors ${String(filterRuleId) === String(rule.id) ? 'bg-orange-50' : ''}`}>
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <div className={`text-sm font-bold truncate ${String(filterRuleId) === String(rule.id) ? 'text-orange-700' : 'text-slate-700'}`}>
-                                                    {/* PERBAIKAN: Tampilkan rule.penalty */}
                                                     {rule.penalty || rule.action} 
                                                 </div>
                                                 <div className="text-xs text-slate-500 font-medium bg-slate-100 inline-block px-1.5 rounded mt-0.5">Range: {rule.min} - {rule.max} Poin</div>
@@ -184,7 +194,6 @@ const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
                                 {student.activeRule ? (
                                     <div className="flex items-start gap-2 text-red-700 font-bold text-sm leading-tight">
                                         <AlertTriangle size={16} className="mt-0.5 flex-shrink-0"/>
-                                        {/* PERBAIKAN: Gunakan 'penalty' agar tampil SP1, SP2, dst */}
                                         <span className="line-clamp-2">
                                             {student.activeRule.penalty || student.activeRule.action || "Sanksi Tidak Bernama"}
                                         </span>
@@ -203,12 +212,13 @@ const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
                                 >
                                     <FileText size={16}/> Tindak Lanjut
                                 </button>
+                                {/* [UBAH 6] Tombol diubah untuk memanggil handleProcessLetter */}
                                 <button 
-                                    onClick={() => handleOpenPrint(student)}
+                                    onClick={() => handleProcessLetter(student)}
                                     className="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center gap-2 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 transition-colors"
-                                    title="Cetak Surat Panggilan"
+                                    title="Proses Surat Sanksi"
                                 >
-                                    <Printer size={16}/> Cetak
+                                    <Printer size={16}/> Proses Surat
                                 </button>
                             </div>
                         </div>
@@ -246,13 +256,7 @@ const SanctionBook = ({ students, pointLogs, sanctionRules, settings }) => {
             )}
 
             {/* MODALS */}
-            <SanctionLetterModal 
-                isOpen={isPrintModalOpen}
-                onClose={() => setIsPrintModalOpen(false)}
-                student={selectedStudent}
-                settings={settings}
-                sanctionRule={selectedStudent?.activeRule}
-            />
+            {/* [UBAH 7] SanctionLetterModal DIHAPUS karena digantikan workflow LetterManager */}
             <SanctionDetailModal 
                 isOpen={isDetailModalOpen}
                 onClose={() => setIsDetailModalOpen(false)}

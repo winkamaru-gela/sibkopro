@@ -10,7 +10,7 @@ import { auth, db, getCollectionRef } from './config/firebase';
 import { COLLECTION_PATHS, INITIAL_ADMIN } from './utils/constants';
 
 // Import Components & Pages
-import ProtectedRoute from './components/ProtectedRoute'; // <--- IMPORT PROTECTED ROUTE
+import ProtectedRoute from './components/ProtectedRoute'; 
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import AdminDashboard from './pages/AdminDashboard';
@@ -26,11 +26,12 @@ import MasterDataSettings from './pages/MasterDataSettings';
 import StudentPointBook from './pages/StudentPointBook';
 import SanctionBook from './pages/SanctionBook';
 import CounselingHistory from './pages/CounselingHistory';
+import LetterManager from './pages/LetterManager';
 
 export default function App() {
     const [authUser, setAuthUser] = useState(null); 
     
-    // 1. INISIALISASI USER DARI LOCAL STORAGE (Supaya tidak logout saat refresh)
+    // 1. INISIALISASI USER DARI LOCAL STORAGE
     const [appUser, setAppUser] = useState(() => {
         const savedUser = localStorage.getItem('appUser_sibko');
         return savedUser ? JSON.parse(savedUser) : null;
@@ -103,10 +104,7 @@ export default function App() {
             const user = allUsers.find(x => x.username === u && x.password === p);
             if (user) {
                 setAppUser(user);
-                // 2. SIMPAN KE LOCAL STORAGE
                 localStorage.setItem('appUser_sibko', JSON.stringify(user));
-                
-                // Redirect cerdas: Kembali ke halaman yang mau diakses, atau ke dashboard
                 const origin = location.state?.from?.pathname || '/';
                 navigate(origin);
             } else {
@@ -119,43 +117,30 @@ export default function App() {
     const handleLogout = () => { 
         if(confirm("Keluar?")) {
             setAppUser(null);
-            // 3. HAPUS DARI LOCAL STORAGE
             localStorage.removeItem('appUser_sibko');
             navigate('/login');
         } 
     };
 
-    // --- WRAPPER CRUD ---
     const handleAddStudent = (d) => addDoc(getCollectionRef(COLLECTION_PATHS.students), {...d, teacherId: appUser.id, createdAt: new Date().toISOString()});
     const handleUpdatePassword = async (data) => {
         await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.users), data.id), { password: data.password, fullName: data.fullName });
         const updatedUser = {...appUser, password: data.password, fullName: data.fullName};
         setAppUser(updatedUser);
-        localStorage.setItem('appUser_sibko', JSON.stringify(updatedUser)); // Update storage juga
+        localStorage.setItem('appUser_sibko', JSON.stringify(updatedUser)); 
         alert("Profil berhasil diperbarui.");
     }
 
-    // --- RENDER UTAMA ---
     if (loading) return <div className="h-screen flex items-center justify-center text-slate-500">Loading System...</div>;
 
     return (
         <Routes>
-            {/* 1. RUTE PUBLIC (LOGIN) */}
-            <Route path="/login" element={
-                !appUser ? (
-                    <Login onLogin={handleLogin} loading={loginLoading} error={loginError} />
-                ) : (
-                    <Navigate to="/" replace />
-                )
-            } />
+            <Route path="/login" element={!appUser ? <Login onLogin={handleLogin} loading={loginLoading} error={loginError} /> : <Navigate to="/" replace />} />
 
-            {/* 2. RUTE TERPROTEKSI (DASHBOARD & MENU LAIN) */}
-            {/* Semua rute di dalam ini akan dicek oleh ProtectedRoute */}
             <Route path="/*" element={
                 <ProtectedRoute user={appUser}>
                     <Layout userRole={appUser?.role} userName={appUser?.fullName} onLogout={handleLogout}>
                         <Routes>
-                            {/* --- RUTE ADMIN --- */}
                             {appUser?.role === 'admin' ? (
                                 <>
                                     <Route path="/" element={<AdminDashboard users={allUsers} />} />
@@ -164,10 +149,8 @@ export default function App() {
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </>
                             ) : (
-                            /* --- RUTE GURU --- */
                                 <>
                                     <Route path="/" element={<GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} />} />
-                                    
                                     <Route path="/students" element={
                                         <StudentManager 
                                             students={students} journals={journals} pointLogs={pointLogs} sanctionRules={sanctionRules} user={appUser}
@@ -186,7 +169,6 @@ export default function App() {
                                             }}
                                         />
                                     } />
-
                                     <Route path="/journal" element={
                                         <Journal 
                                             students={students} journals={journals} settings={mySettings}
@@ -195,15 +177,24 @@ export default function App() {
                                             onDelete={(id) => deleteDoc(doc(db, COLLECTION_PATHS.journals, id))}
                                         />
                                     } />
-
-                                    {/* Layanan BK Submenus */}
                                     <Route path="/points" element={<PointManager students={students} pointLogs={pointLogs} masterPoints={masterPoints} sanctionRules={sanctionRules} onAddPoint={(d) => addDoc(collection(db, 'point_logs'), {...d, teacherId: appUser.id})} onUpdatePoint={(d) => updateDoc(doc(db, 'point_logs', d.id), d)} onDeletePoint={(id) => deleteDoc(doc(db, 'point_logs', id))} />} />
                                     <Route path="/point-book" element={<StudentPointBook students={students} pointLogs={pointLogs} journals={journals} settings={mySettings} sanctionRules={sanctionRules} />} />
                                     <Route path="/sanction-book" element={<SanctionBook students={students} pointLogs={pointLogs} sanctionRules={sanctionRules} settings={mySettings} />} />
                                     <Route path="/counseling-history" element={<CounselingHistory students={students} journals={journals} settings={mySettings} user={appUser} />} />
-
                                     <Route path="/reports" element={<Reports journals={journals} students={students} settings={mySettings} />} />
                                     
+                                    {/* [PERBAIKAN] MENAMBAHKAN pointLogs, masterPoints, sanctionRules KE LetterManager */}
+                                    <Route path="/letters" element={
+                                        <LetterManager 
+                                            students={students} 
+                                            user={appUser} 
+                                            settings={mySettings} 
+                                            pointLogs={pointLogs}
+                                            masterPoints={masterPoints}
+                                            sanctionRules={sanctionRules}
+                                        /> 
+                                    } />
+
                                     <Route path="/master-points" element={
                                         <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
                                             <MasterDataSettings 
@@ -214,11 +205,8 @@ export default function App() {
                                             />
                                         </div>
                                     } />
-
                                     <Route path="/settings" element={<SchoolSettings settings={mySettings} onSave={(d) => mySettings.id ? updateDoc(doc(getCollectionRef(COLLECTION_PATHS.settings), mySettings.id), d).then(()=>alert("Tersimpan")) : addDoc(getCollectionRef(COLLECTION_PATHS.settings), {...d, teacherId: appUser.id}).then(()=>alert("Tersimpan"))} />} />
                                     <Route path="/account" element={<AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />} />
-                                    
-                                    {/* Redirect halaman tak dikenal ke Dashboard (bukan Login karena sudah diprotect) */}
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </>
                             )}
