@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, or } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { FileText, Settings } from 'lucide-react';
 
@@ -11,13 +11,46 @@ export default function LetterManager({ students, user, settings, pointLogs, mas
     const [activeTab, setActiveTab] = useState('create'); 
     const [templates, setTemplates] = useState([]);
 
-    // Fetch Templates (Data di-fetch di Parent agar bisa dipakai kedua tab)
+    // --- FETCH TEMPLATES (GABUNGAN GLOBAL & PRIBADI) ---
     useEffect(() => {
         if (!user) return;
-        const q = query(collection(db, 'letter_templates'), where("teacherId", "==", user.id));
+
+        let q;
+        
+        if (user.role === 'admin') {
+            // Admin melihat SEMUA template (Global + Punya Semua Guru - Opsional, 
+            // tapi biasanya Admin fokus ke Global. Di sini kita ambil Global saja atau Semua)
+            // Untuk simpel: Admin mengambil semua template yang isGlobal=true ATAU miliknya sendiri
+            q = query(
+                collection(db, 'letter_templates'), 
+                or(
+                    where("isGlobal", "==", true),
+                    where("teacherId", "==", user.id)
+                )
+            );
+        } else {
+            // Guru mengambil: Template Global (isGlobal == true) GABUNG Template Pribadi (teacherId == user.id)
+            q = query(
+                collection(db, 'letter_templates'), 
+                or(
+                    where("isGlobal", "==", true),
+                    where("teacherId", "==", user.id)
+                )
+            );
+        }
+
         const unsub = onSnapshot(q, (snap) => {
-            setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})));
+            const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            
+            // Urutkan: Global dulu, baru Pribadi
+            const sortedData = data.sort((a, b) => {
+                if (a.isGlobal === b.isGlobal) return a.title.localeCompare(b.title);
+                return a.isGlobal ? -1 : 1;
+            });
+            
+            setTemplates(sortedData);
         });
+
         return () => unsub();
     }, [user]);
 
@@ -57,6 +90,7 @@ export default function LetterManager({ students, user, settings, pointLogs, mas
                     settings={settings} 
                     pointLogs={pointLogs} 
                     sanctionRules={sanctionRules} 
+                    user={user}
                 />
             )}
 

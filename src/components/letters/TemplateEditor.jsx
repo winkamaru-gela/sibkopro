@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Editor } from '@tinymce/tinymce-react';
 import { 
     Plus, Save, Trash2, Edit3, ArrowLeft, LayoutTemplate, PenTool, 
-    Variable, Copy, Info 
+    Variable, Copy, Info, Globe, Lock, User as UserIcon, ShieldAlert 
 } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -14,6 +14,7 @@ const TemplateEditor = ({ templates, user, settings }) => {
     const [tempTitle, setTempTitle] = useState('');
     const [tempBody, setTempBody] = useState('');
 
+    // --- DAFTAR VARIABEL UPDATE ---
     const AVAILABLE_VARIABLES = [
         { category: "Data Kop Surat", items: [
             { code: "[LOGO_KIRI]", label: "Logo Kiri (Image)" },
@@ -22,8 +23,7 @@ const TemplateEditor = ({ templates, user, settings }) => {
             { code: "[NAMA_DINAS]", label: "Nama Dinas" },
             { code: "[NAMA_SEKOLAH]", label: "Nama Sekolah" },
             { code: "[ALAMAT_1]", label: "Alamat Baris 1 (Jalan)" },
-            // [UPDATE] Label disesuaikan dengan Form Existing Anda
-            { code: "[ALAMAT_2]", label: "Info Tambahan (Email/Web)" }, 
+            { code: "[ALAMAT_2]", label: "Info Tambahan (Email/Web)" },
             { code: "[KOTA_SEKOLAH]", label: "Kota/Kabupaten" },
         ]},
         { category: "Data Siswa", items: [
@@ -38,6 +38,9 @@ const TemplateEditor = ({ templates, user, settings }) => {
             { code: "[TOTAL_POIN]", label: "Total Poin" },
             { code: "[SANKSI_SAAT_INI]", label: "Status Sanksi" },
             { code: "[LIST_PELANGGARAN]", label: "Tabel Riwayat Pelanggaran" },
+            // [BARU]
+            { code: "[KODE_PELANGGARAN]", label: "List Kode Pelanggaran" },
+            { code: "[JENIS_PELANGGARAN]", label: "List Jenis Pelanggaran" },
         ]},
         { category: "Data Surat", items: [
             { code: "[NOMOR_SURAT]", label: "Nomor Surat" },
@@ -56,20 +59,26 @@ const TemplateEditor = ({ templates, user, settings }) => {
     const handleSaveTemplate = async () => {
         if(!tempTitle || !tempBody) return alert("Judul dan Isi tidak boleh kosong");
         
+        const isGlobal = user.role === 'admin';
+
         const payload = {
             title: tempTitle,
             body: tempBody, 
             teacherId: user.id,
+            isGlobal: isGlobal, 
             updatedAt: new Date().toISOString()
         };
 
         try {
             if (editingTemplate && editingTemplate.id) {
+                if(editingTemplate.isGlobal && user.role !== 'admin') {
+                    return alert("Anda tidak memiliki akses untuk mengubah template ini.");
+                }
                 await updateDoc(doc(db, 'letter_templates', editingTemplate.id), payload);
                 alert("Template berhasil diperbarui");
             } else {
                 await addDoc(collection(db, 'letter_templates'), payload);
-                alert("Template baru berhasil disimpan");
+                alert(isGlobal ? "Template Global (Admin) berhasil disimpan" : "Template Pribadi berhasil disimpan");
             }
             setEditingTemplate(null);
             setTempTitle('');
@@ -80,8 +89,11 @@ const TemplateEditor = ({ templates, user, settings }) => {
         }
     };
 
-    const handleDeleteTemplate = async (id) => {
-        if(confirm("Hapus template ini?")) await deleteDoc(doc(db, 'letter_templates', id));
+    const handleDeleteTemplate = async (template) => {
+        if(template.isGlobal && user.role !== 'admin') {
+            return alert("Template Global tidak dapat dihapus oleh Guru.");
+        }
+        if(confirm("Hapus template ini?")) await deleteDoc(doc(db, 'letter_templates', template.id));
     };
 
     const insertToEditor = (html) => {
@@ -105,36 +117,15 @@ const TemplateEditor = ({ templates, user, settings }) => {
                 <tr><td>NISN</td><td>: [NISN]</td></tr>
             </table>
             <p>&nbsp;</p>
-            <p>Dengan ini mengakui bahwa saya telah melakukan pelanggaran tata tertib sekolah sebagai berikut:</p>
+            <p>Dengan ini mengakui bahwa saya telah melakukan pelanggaran sebagai berikut:</p>
+            <p><b>[JENIS_PELANGGARAN]</b></p>
             
+            <p>Detail Riwayat:</p>
             [LIST_PELANGGARAN]
             
-            <p style="text-align: justify;">Saya berjanji tidak akan mengulangi perbuatan tersebut. Apabila saya melanggar lagi, saya siap menerima sanksi lebih berat sesuai aturan sekolah.</p>
+            <p style="text-align: justify;">Saya berjanji tidak akan mengulangi perbuatan tersebut.</p>
             <p>&nbsp;</p>
-            
-            <table style="width: 100%; border: 0;">
-                <tr>
-                    <td style="width: 50%; text-align: center; vertical-align: top;">
-                        <p>Mengetahui,<br/>Orang Tua/Wali</p>
-                        <br/><br/><br/><br/><br/>
-                        <p style="font-weight: bold; text-decoration: underline;">( [NAMA_ORANGTUA] )</p>
-                    </td>
-                    <td style="width: 50%; text-align: center; vertical-align: top;">
-                        <p>[KOTA_SEKOLAH], [TANGGAL_SEKARANG]<br/>Yang Membuat Pernyataan,</p>
-                        <div style="border: 1px solid black; width: 80px; height: 50px; margin: 10px auto; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; font-family: sans-serif;">
-                            MATERAI<br/>10.000
-                        </div>
-                        <p style="font-weight: bold; text-decoration: underline;">( [NAMA_SISWA] )</p>
-                    </td>
-                </tr>
-            </table>
-            
-            <div style="text-align: center; margin-top: 20px;">
-                <p>Mengetahui,<br/>Guru BK / Konselor</p>
-                <br/><br/><br/>
-                <p style="font-weight: bold; text-decoration: underline;">${settings?.counselor || user?.fullName || '...'}</p>
-                <p>NIP. ${settings?.nipCounselor || '-'}</p>
-            </div>
+            ${getTandaTanganHTML(settings, user)}
         `;
         setTempBody(initialBody); 
     };
@@ -151,30 +142,47 @@ const TemplateEditor = ({ templates, user, settings }) => {
                     </button>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {templates.map(t => (
-                            <div key={t.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all group relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                                <h4 className="font-bold text-slate-800 text-lg mb-2 pr-16">{t.title}</h4>
-                                <div className="text-xs text-slate-500 mb-4 h-12 overflow-hidden relative">
-                                    {t.body.replace(/<[^>]*>?/gm, ' ').substring(0, 100)}...
-                                    <div className="absolute bottom-0 w-full h-4 bg-gradient-to-t from-white to-transparent"></div>
+                        {templates.map(t => {
+                            const canEdit = user.role === 'admin' || !t.isGlobal;
+                            return (
+                                <div key={t.id} className={`bg-white p-5 rounded-xl shadow-sm border transition-all group relative overflow-hidden ${t.isGlobal ? 'border-purple-200' : 'border-slate-200 hover:shadow-md hover:border-blue-300'}`}>
+                                    <div className={`absolute top-0 right-0 px-2 py-1 rounded-bl-lg text-[10px] font-bold ${t.isGlobal ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        {t.isGlobal ? <span className="flex items-center gap-1"><Globe size={10}/> Global (Admin)</span> : <span className="flex items-center gap-1"><UserIcon size={10}/> Pribadi</span>}
+                                    </div>
+
+                                    <div className={`absolute top-0 left-0 w-1 h-full ${t.isGlobal ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                                    
+                                    <h4 className="font-bold text-slate-800 text-lg mb-2 pr-16 truncate">{t.title}</h4>
+                                    <div className="text-xs text-slate-500 mb-4 h-12 overflow-hidden relative">
+                                        {t.body.replace(/<[^>]*>?/gm, ' ').substring(0, 100)}...
+                                        <div className="absolute bottom-0 w-full h-4 bg-gradient-to-t from-white to-transparent"></div>
+                                    </div>
+                                    
+                                    <div className="flex justify-end gap-2 border-t pt-3">
+                                        {canEdit ? (
+                                            <>
+                                                <button 
+                                                    onClick={() => { setEditingTemplate(t); setTempTitle(t.title); setTempBody(t.body); }}
+                                                    className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1"
+                                                >
+                                                    <Edit3 size={14}/> Edit
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteTemplate(t)}
+                                                    className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1"
+                                                >
+                                                    <Trash2 size={14}/> Hapus
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-slate-400 text-xs py-1.5 italic">
+                                                <Lock size={12}/> Terkunci (Milik Admin)
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex justify-end gap-2 border-t pt-3">
-                                    <button 
-                                        onClick={() => { setEditingTemplate(t); setTempTitle(t.title); setTempBody(t.body); }}
-                                        className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1"
-                                    >
-                                        <Edit3 size={14}/> Edit
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDeleteTemplate(t.id)}
-                                        className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1"
-                                    >
-                                        <Trash2 size={14}/> Hapus
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -183,6 +191,13 @@ const TemplateEditor = ({ templates, user, settings }) => {
                 <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-140px)]">
                     
                     <div className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-full">
+                        {user.role === 'admin' && (
+                            <div className="bg-purple-50 text-purple-700 px-4 py-2 text-[10px] font-bold border-b border-purple-100 flex items-center justify-between">
+                                <span className="flex items-center gap-2"><Globe size={12}/> MODE ADMIN: Template ini akan disimpan sebagai GLOBAL (Dapat digunakan oleh semua guru).</span>
+                                <span className="flex items-center gap-1"><ShieldAlert size={12}/> Akses Penuh</span>
+                            </div>
+                        )}
+
                         <div className="p-3 border-b bg-slate-50 flex justify-between items-center flex-shrink-0">
                             <div className="flex items-center gap-3 w-full max-w-xl">
                                 <button onClick={() => setEditingTemplate(null)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-500">
@@ -237,15 +252,8 @@ const TemplateEditor = ({ templates, user, settings }) => {
                                         
                                         line_height_formats: '1 1.15 1.5 2 2.5 3', 
                                         content_style: `
-                                            body { 
-                                                font-family: 'Times New Roman', serif; 
-                                                font-size: 12pt; 
-                                                line-height: 1.15; 
-                                            }
-                                            p { 
-                                                margin-bottom: 0.5em; 
-                                                margin-top: 0; 
-                                            }
+                                            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.15; }
+                                            p { margin-bottom: 0.5em; margin-top: 0; }
                                             ul, ol { margin-bottom: 0.5em; margin-top: 0; }
                                             li { margin-bottom: 0; }
                                             table { border-collapse: collapse; }

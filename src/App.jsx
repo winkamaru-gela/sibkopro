@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'; // Import Router
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'; 
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { 
-  query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, writeBatch, collection, setDoc, where 
+  query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, writeBatch, collection, setDoc, where, getDocs 
 } from 'firebase/firestore';
 
 // Import Config & Utils
@@ -55,74 +55,146 @@ export default function App() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // --- AUTH & DATA FETCHING ---
-
+    // --- 1. AUTHENTICATION & INITIAL LOAD ---
     useEffect(() => {
         signInAnonymously(auth).catch(console.error);
-        return onAuthStateChanged(auth, u => setAuthUser(u));
-    }, []);
+        
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+            setAuthUser(u);
+            
+            // [PERBAIKAN UTAMA] 
+            // Jika firebase connect TAPI tidak ada user yang tersimpan di localStorage,
+            // Matikan loading agar halaman Login bisa muncul.
+            if (u && !appUser) {
+                setLoading(false);
+            }
+        });
 
-    // Fetch Users (Admin)
+        return () => unsubscribe();
+    }, []); // Dependency kosong agar hanya jalan sekali
+
+    // --- 2. FETCH DATA UNTUK ADMIN ---
     useEffect(() => {
-        if (!authUser) return;
+        // Hanya jalan jika Auth Firebase ready DAN user adalah Admin
+        if (!authUser || appUser?.role !== 'admin') return;
+
         const q = query(getCollectionRef(COLLECTION_PATHS.users));
         const unsub = onSnapshot(q, (snap) => {
             const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
             setAllUsers(data);
-            if(data.length === 0) addDoc(getCollectionRef(COLLECTION_PATHS.users), INITIAL_ADMIN);
+            
+            // Auto-create admin jika kosong (First Run)
+            if(data.length === 0) {
+                addDoc(getCollectionRef(COLLECTION_PATHS.users), INITIAL_ADMIN);
+            }
             setLoading(false);
         });
         return () => unsub();
-    }, [authUser]);
+    }, [authUser, appUser]);
 
-    // Fetch Data Guru
+    // --- 3. FETCH DATA UNTUK GURU & OPERASIONAL ---
     useEffect(() => {
-        if (!appUser || !authUser || appUser.role === 'admin') return;
+        // Butuh Auth Firebase DAN App User (Baik Guru maupun Admin)
+        if (!authUser || !appUser) return;
 
-        const qStudents = query(getCollectionRef(COLLECTION_PATHS.students), where("teacherId", "==", appUser.id));
-        const unsubStudents = onSnapshot(qStudents, snap => setStudents(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-
-        const qJournals = query(getCollectionRef(COLLECTION_PATHS.journals), where("teacherId", "==", appUser.id));
-        const unsubJournals = onSnapshot(qJournals, snap => setJournals(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-
+        // Fetch Settings & Master Data (Semua Role butuh ini)
         const qSettings = query(getCollectionRef(COLLECTION_PATHS.settings), where("teacherId", "==", appUser.id));
-        const unsubSettings = onSnapshot(qSettings, snap => { if(!snap.empty) setMySettings({id: snap.docs[0].id, ...snap.docs[0].data()}); else setMySettings({}); });
-
-        const qPoints = query(collection(db, 'point_logs'), where("teacherId", "==", appUser.id));
-        const unsubPoints = onSnapshot(qPoints, snap => setPointLogs(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+        const unsubSettings = onSnapshot(qSettings, snap => { 
+            if(!snap.empty) setMySettings({id: snap.docs[0].id, ...snap.docs[0].data()}); 
+            else setMySettings({}); 
+        });
 
         const unsubMaster = onSnapshot(doc(db, 'settings', `master_points_${appUser.id}`), (docSnap) => setMasterPoints(docSnap.exists() ? docSnap.data().items : []));
         const unsubSanctions = onSnapshot(doc(db, 'settings', `sanction_rules_${appUser.id}`), (docSnap) => setSanctionRules(docSnap.exists() ? docSnap.data().items : []));
 
-        return () => { unsubStudents(); unsubJournals(); unsubSettings(); unsubPoints(); unsubMaster(); unsubSanctions(); };
-    }, [appUser, authUser]);
+        // Fetch Data Spesifik Guru (Hanya jika bukan Admin)
+        let unsubStudents = () => {};
+        let unsubJournals = () => {};
+        let unsubPoints = () => {};
 
-    // --- LOGIC LOGIN & LOGOUT ---
-    const handleLogin = (u, p) => {
-        setLoginLoading(true); setLoginError('');
-        setTimeout(() => {
-            const user = allUsers.find(x => x.username === u && x.password === p);
-            if (user) {
-                setAppUser(user);
-                localStorage.setItem('appUser_sibko', JSON.stringify(user));
+        if (appUser.role !== 'admin') {
+            const qStudents = query(getCollectionRef(COLLECTION_PATHS.students), where("teacherId", "==", appUser.id));
+            unsubStudents = onSnapshot(qStudents, snap => setStudents(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+
+            const qJournals = query(getCollectionRef(COLLECTION_PATHS.journals), where("teacherId", "==", appUser.id));
+            unsubJournals = onSnapshot(qJournals, snap => setJournals(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+
+            const qPoints = query(collection(db, 'point_logs'), where("teacherId", "==", appUser.id));
+            unsubPoints = onSnapshot(qPoints, snap => setPointLogs(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+            
+            // Set loading false setelah init listener guru
+            setLoading(false);
+        } else {
+            // Jika admin, matikan loading di sini juga (backup jika useEffect admin telat)
+            setLoading(false);
+        }
+
+        return () => { 
+            unsubStudents(); unsubJournals(); unsubSettings(); 
+            unsubPoints(); unsubMaster(); unsubSanctions(); 
+        };
+    }, [authUser, appUser]);
+
+    // --- LOGIC LOGIN (DIPERBAIKI) ---
+    const handleLogin = async (u, p) => {
+        setLoginLoading(true); 
+        setLoginError('');
+        
+        try {
+            // [PERBAIKAN] Query langsung ke Firestore, jangan andalkan state allUsers yang mungkin kosong
+            const q = query(
+                getCollectionRef(COLLECTION_PATHS.users), 
+                where("username", "==", u),
+                where("password", "==", p)
+            );
+            
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const userDoc = querySnapshot.docs[0];
+                const userData = { id: userDoc.id, ...userDoc.data() };
+                
+                setAppUser(userData);
+                localStorage.setItem('appUser_sibko', JSON.stringify(userData));
+                
+                // Redirect ke halaman asal atau home
                 const origin = location.state?.from?.pathname || '/';
                 navigate(origin);
             } else {
-                setLoginError('Salah username/password');
+                // Fallback untuk inisialisasi awal jika database benar-benar kosong
+                // Cek apakah ini login admin default pertama kali
+                if (u === INITIAL_ADMIN.username && p === INITIAL_ADMIN.password) {
+                     // Cek apakah users collection kosong
+                     const allUsersSnap = await getDocs(getCollectionRef(COLLECTION_PATHS.users));
+                     if (allUsersSnap.empty) {
+                         const docRef = await addDoc(getCollectionRef(COLLECTION_PATHS.users), INITIAL_ADMIN);
+                         const newAdmin = { id: docRef.id, ...INITIAL_ADMIN };
+                         setAppUser(newAdmin);
+                         localStorage.setItem('appUser_sibko', JSON.stringify(newAdmin));
+                         navigate('/');
+                         return;
+                     }
+                }
+                setLoginError('Salah username atau password');
             }
+        } catch (error) {
+            console.error("Login Error:", error);
+            setLoginError('Terjadi kesalahan koneksi.');
+        } finally {
             setLoginLoading(false);
-        }, 800);
+        }
     };
 
     const handleLogout = () => { 
         if(confirm("Keluar?")) {
             setAppUser(null);
+            setAllUsers([]); // Bersihkan data sensitif
+            setStudents([]);
             localStorage.removeItem('appUser_sibko');
             navigate('/login');
         } 
     };
 
-    const handleAddStudent = (d) => addDoc(getCollectionRef(COLLECTION_PATHS.students), {...d, teacherId: appUser.id, createdAt: new Date().toISOString()});
     const handleUpdatePassword = async (data) => {
         await updateDoc(doc(getCollectionRef(COLLECTION_PATHS.users), data.id), { password: data.password, fullName: data.fullName });
         const updatedUser = {...appUser, password: data.password, fullName: data.fullName};
@@ -131,7 +203,7 @@ export default function App() {
         alert("Profil berhasil diperbarui.");
     }
 
-    if (loading) return <div className="h-screen flex items-center justify-center text-slate-500">Loading System...</div>;
+    if (loading) return <div className="h-screen flex items-center justify-center text-slate-500 font-bold animate-pulse">Loading System...</div>;
 
     return (
         <Routes>
@@ -145,6 +217,22 @@ export default function App() {
                                 <>
                                     <Route path="/" element={<AdminDashboard users={allUsers} />} />
                                     <Route path="/users" element={<AdminUserManagement users={allUsers} />} />
+                                    <Route path="/letters" element={
+                                        <LetterManager 
+                                            students={students} 
+                                            user={appUser} 
+                                            settings={mySettings} 
+                                            pointLogs={pointLogs}
+                                            masterPoints={masterPoints}
+                                            sanctionRules={sanctionRules}
+                                        /> 
+                                    } />
+                                    <Route path="/settings" element={
+                                        <SchoolSettings 
+                                            settings={mySettings} 
+                                            onSave={(d) => mySettings.id ? updateDoc(doc(getCollectionRef(COLLECTION_PATHS.settings), mySettings.id), d).then(()=>alert("Tersimpan")) : addDoc(getCollectionRef(COLLECTION_PATHS.settings), {...d, teacherId: appUser.id}).then(()=>alert("Tersimpan"))} 
+                                        />
+                                    } />
                                     <Route path="/account" element={<AccountSettings user={appUser} onUpdatePassword={handleUpdatePassword} />} />
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </>
@@ -154,7 +242,7 @@ export default function App() {
                                     <Route path="/students" element={
                                         <StudentManager 
                                             students={students} journals={journals} pointLogs={pointLogs} sanctionRules={sanctionRules} user={appUser}
-                                            onAdd={handleAddStudent} 
+                                            onAdd={(d) => addDoc(getCollectionRef(COLLECTION_PATHS.students), {...d, teacherId: appUser.id, createdAt: new Date().toISOString()})} 
                                             onEdit={(d) => updateDoc(doc(getCollectionRef(COLLECTION_PATHS.students), d.id), d)} 
                                             onDelete={(id) => deleteDoc(doc(getCollectionRef(COLLECTION_PATHS.students), id))}
                                             onImport={(list) => { 
@@ -182,8 +270,6 @@ export default function App() {
                                     <Route path="/sanction-book" element={<SanctionBook students={students} pointLogs={pointLogs} sanctionRules={sanctionRules} settings={mySettings} />} />
                                     <Route path="/counseling-history" element={<CounselingHistory students={students} journals={journals} settings={mySettings} user={appUser} />} />
                                     <Route path="/reports" element={<Reports journals={journals} students={students} settings={mySettings} />} />
-                                    
-                                    {/* [PERBAIKAN] MENAMBAHKAN pointLogs, masterPoints, sanctionRules KE LetterManager */}
                                     <Route path="/letters" element={
                                         <LetterManager 
                                             students={students} 
@@ -194,7 +280,6 @@ export default function App() {
                                             sanctionRules={sanctionRules}
                                         /> 
                                     } />
-
                                     <Route path="/master-points" element={
                                         <div className="space-y-8 animate-in fade-in pb-10 p-4 md:p-6">
                                             <MasterDataSettings 

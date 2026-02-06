@@ -36,11 +36,13 @@ const Layout = ({ children, userRole, userName, onLogout }) => {
         }
     };
 
-    // --- DEFINISI MENU ---
+    // --- DEFINISI MENU (DIPERBARUI) ---
     const menuItems = userRole === 'admin' 
         ? [
             { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/' },
             { id: 'users', label: 'Manajemen User', icon: Users, path: '/users' },
+            // [UPDATE] Menambahkan Menu Surat untuk Admin agar bisa buat Template Global
+            { id: 'letters', label: 'Manajemen Surat', icon: Mail, path: '/letters' },
             { id: 'account', label: 'Profil Admin', icon: UserCog, path: '/account' } 
           ]
         : [
@@ -80,7 +82,6 @@ const Layout = ({ children, userRole, userName, onLogout }) => {
         } else {
             navigate(item.path);
             
-            // --- PERBAIKAN DI SINI ---
             // Jika kita mengklik menu biasa (bukan grup), tutup semua dropdown grup yang sedang terbuka
             setExpandedMenu(null); 
             

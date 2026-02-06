@@ -9,13 +9,19 @@ import LetterPrintModal from './LetterPrintModal';
 const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules, user }) => {
     const location = useLocation();
     
+    // State Form
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [letterNumber, setLetterNumber] = useState('001/BK/2026');
     
+    // State Editor
     const [editorContent, setEditorContent] = useState('');
     const [showPrintModal, setShowPrintModal] = useState(false);
     const editorRef = useRef(null);
+
+    // Pisahkan template
+    const globalTemplates = templates.filter(t => t.isGlobal);
+    const personalTemplates = templates.filter(t => !t.isGlobal);
 
     useEffect(() => {
         if (location.state?.preSelectedStudentId) {
@@ -38,11 +44,16 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
 
         let content = template.body;
 
+        // 1. Ambil Data Log
         const logs = (pointLogs || []).filter(l => l.studentId === selectedStudentId);
-        const vTotal = logs.filter(l => l.type === 'violation').reduce((a, b) => a + parseInt(b.value || 0), 0);
+        const violations = logs.filter(l => l.type === 'violation');
+
+        // 2. Hitung Poin
+        const vTotal = violations.reduce((a, b) => a + parseInt(b.value || 0), 0);
         const aTotal = logs.filter(l => l.type === 'achievement').reduce((a, b) => a + parseInt(b.value || 0), 0);
         const currentNetScore = vTotal - aTotal;
 
+        // 3. Tentukan Sanksi
         const activeRule = (sanctionRules || [])
             .sort((a,b) => b.max - a.max) 
             .find(rule => currentNetScore >= rule.min && currentNetScore <= rule.max);
@@ -53,22 +64,35 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
 
         const violationListHtml = getViolationListHTML(selectedStudentId, pointLogs, sanctionRules);
 
+        // 4. [BARU] EKSTRAK KODE & JENIS PELANGGARAN (UNIK)
+        // Mengambil daftar kode unik (misal: "A01, B03")
+        const uniqueCodes = [...new Set(violations.map(v => v.code).filter(c => c))].join(', ');
+
+        // Mengambil deskripsi pelanggaran unik (misal: "Terlambat, Merokok")
+        const uniqueTypes = [...new Set(violations.map(v => {
+            let desc = v.description || '';
+            // Bersihkan jika deskripsi mengandung kode di depannya (misal "A01 - Terlambat")
+            if (v.code && desc.startsWith(v.code)) {
+                desc = desc.replace(`${v.code} - `, '').replace(`${v.code}-`, '').trim();
+            }
+            return desc;
+        }).filter(d => d))].join(', ');
+
+
+        // 5. Setup Logo
         const imgLogoKiri = settings.logo ? `<img src="${settings.logo}" style="height: 80px; width: auto; object-fit: contain;" alt="Logo"/>` : '';
         const imgLogoKanan = settings.logo2 ? `<img src="${settings.logo2}" style="height: 80px; width: auto; object-fit: contain;" alt="Logo 2"/>` : '';
 
-        // --- MAPPING VARIABEL (DISESUAIKAN) ---
+        // 6. Replace Variabel
         const replacers = {
-            // Data Kop Surat
+            // Data Kop
             '[LOGO_KIRI]': imgLogoKiri,
             '[LOGO_KANAN]': imgLogoKanan,
             '[NAMA_PEMERINTAH]': settings.government || '',
             '[NAMA_DINAS]': settings.department || '',
             '[NAMA_SEKOLAH]': settings.name || 'Nama Sekolah',
             '[ALAMAT_1]': settings.address || '',
-            
-            // [UPDATE] Mengambil dari address2 ATAU website (sesuai form Info Tambahan Anda)
             '[ALAMAT_2]': settings.address2 || settings.website || '', 
-            
             '[ALAMAT_SEKOLAH]': settings.address || '', 
             '[KOTA_SEKOLAH]': settings.city || '', 
 
@@ -79,15 +103,19 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
             '[NAMA_ORANGTUA]': student.parent || 'Orang Tua/Wali',
             '[ALAMAT]': student.address || 'Di Tempat',
             '[HP_ORANGTUA]': student.parentPhone || '-',
+            
+            // Pelanggaran & Sanksi
             '[TOTAL_POIN]': currentNetScore, 
             '[SANKSI_SAAT_INI]': sanctionText,
             '[LIST_PELANGGARAN]': violationListHtml, 
+            '[KODE_PELANGGARAN]': uniqueCodes || '-', // <--- BARU
+            '[JENIS_PELANGGARAN]': uniqueTypes || '-', // <--- BARU
 
-            // Data Surat
+            // Surat & Tanggal
             '[NOMOR_SURAT]': letterNumber,
             '[TANGGAL_SEKARANG]': formatIndoDate(new Date().toISOString()),
             
-            // Data Pejabat
+            // Pejabat
             '[KEPALA_SEKOLAH]': settings.headmaster || '...',
             '[NIP_KEPSEK]': settings.nipHeadmaster || '-',
             '[WAKA_KESISWAAN]': settings.wakaKesiswaan || '...', 
@@ -132,7 +160,16 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
                                 onChange={(e) => { setSelectedTemplateId(e.target.value); setEditorContent(''); }}
                             >
                                 <option value="">-- Pilih Jenis Surat --</option>
-                                {templates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                                {globalTemplates.length > 0 && (
+                                    <optgroup label="Template Sekolah (Global)">
+                                        {globalTemplates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                                    </optgroup>
+                                )}
+                                {personalTemplates.length > 0 && (
+                                    <optgroup label="Template Pribadi">
+                                        {personalTemplates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                                    </optgroup>
+                                )}
                             </select>
                             {location.state?.suggestedTemplateKeyword && !selectedTemplateId && (
                                 <p className="text-[10px] text-blue-500 mt-1 italic">*Saran: "{location.state.suggestedTemplateKeyword}"</p>
@@ -177,11 +214,11 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
 
                 <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-xs space-y-2 border border-blue-100">
                     <p className="font-bold flex items-center gap-2"><AlertCircle size={14}/> Info:</p>
-                    <p>Variabel Tersedia: <b>[LIST_PELANGGARAN]</b>, <b>[SANKSI_SAAT_INI]</b>, <b>[TOTAL_POIN]</b>.</p>
+                    <p>Gunakan variabel <b>[JENIS_PELANGGARAN]</b> untuk menampilkan daftar pelanggaran dalam satu baris teks.</p>
                 </div>
             </div>
 
-            {/* Panel Kanan: Editor Preview (TinyMCE) */}
+            {/* Panel Kanan: Editor Preview */}
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full">
                 <div className="p-3 border-b bg-slate-50 flex justify-between items-center flex-shrink-0">
                     <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
@@ -208,30 +245,10 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
                                 init={{
                                     height: "100%",
                                     menubar: false,
-                                    plugins: [
-                                        'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-                                        'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                                        'insertdatetime', 'media', 'table', 'help', 'wordcount'
-                                    ],
+                                    plugins: ['advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen', 'insertdatetime', 'media', 'table', 'help', 'wordcount'],
                                     toolbar: 'undo redo | fontfamily fontsize | bold italic underline | alignleft aligncenter alignright alignjustify | lineheight | bullist numlist outdent indent | table | removeformat',
-                                    
                                     line_height_formats: '1 1.15 1.5 2 2.5 3', 
-                                    content_style: `
-                                        body { 
-                                            font-family: 'Times New Roman', serif; 
-                                            font-size: 12pt; 
-                                            line-height: 1.15; 
-                                            color: black;
-                                        }
-                                        p { 
-                                            margin-bottom: 0.5em; 
-                                            margin-top: 0; 
-                                        }
-                                        ul, ol { margin-bottom: 0.5em; margin-top: 0; }
-                                        li { margin-bottom: 0; }
-                                        table { border-collapse: collapse; }
-                                        td { padding: 2px; }
-                                    `,
+                                    content_style: `body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.15; color: black; } p { margin-bottom: 0.5em; margin-top: 0; } ul, ol { margin-bottom: 0.5em; margin-top: 0; } li { margin-bottom: 0; } table { border-collapse: collapse; } td { padding: 2px; }`,
                                     statusbar: false,
                                     zindex: 10
                                 }}
