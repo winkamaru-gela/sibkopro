@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Settings, Save, Image as ImageIcon, MapPin, 
     CalendarClock, Building2, FileSignature, 
-    LayoutTemplate, UploadCloud, ChevronRight, ChevronDown, Link as LinkIcon, Trash2 
+    UploadCloud, ChevronRight, Link as LinkIcon, Trash2, Eye 
 } from 'lucide-react';
 
 const SchoolSettings = ({ settings, onSave }) => {
@@ -25,7 +25,8 @@ const SchoolSettings = ({ settings, onSave }) => {
         ...settings 
     });
     
-    const [activeTab, setActiveTab] = useState('profile');
+    // Default tab set to 'academic' sesuai urutan baru
+    const [activeTab, setActiveTab] = useState('academic');
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -38,7 +39,7 @@ const SchoolSettings = ({ settings, onSave }) => {
     const handleFile = (e, key) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 2048 * 1024) return alert("Ukuran file maksimal 2MB"); // Naikkan limit ke 2MB
+            if (file.size > 2048 * 1024) return alert("Ukuran file maksimal 2MB");
             const reader = new FileReader();
             reader.onloadend = () => {
                 setForm(prev => ({ ...prev, [key]: reader.result }));
@@ -62,11 +63,12 @@ const SchoolSettings = ({ settings, onSave }) => {
         }, 600);
     };
 
+    // Tabs Configuration
     const TABS = [
-        { id: 'profile', label: 'Profil & Identitas', icon: Building2, desc: 'Nama sekolah, alamat, dan kop surat' },
-        { id: 'officials', label: 'Pejabat Penandatangan', icon: FileSignature, desc: 'Kepala sekolah, BK, dan Kesiswaan' },
-        { id: 'assets', label: 'Logo & Aset', icon: ImageIcon, desc: 'Logo kiri dan kanan pada kop surat' },
         { id: 'academic', label: 'Periode Akademik', icon: CalendarClock, desc: 'Tahun ajaran dan semester aktif' },
+        { id: 'profile', label: 'Profil & Identitas', icon: Building2, desc: 'Nama sekolah, alamat, dan kop surat' },
+        { id: 'assets', label: 'Logo & Aset', icon: ImageIcon, desc: 'Logo kiri dan kanan pada kop surat' },
+        { id: 'officials', label: 'Pejabat Penandatangan', icon: FileSignature, desc: 'Kepala sekolah, BK, dan Kesiswaan' },
     ];
 
     return (
@@ -129,6 +131,49 @@ const SchoolSettings = ({ settings, onSave }) => {
                 {/* FORM CONTENT */}
                 <div className="flex-1 w-full bg-white rounded-xl shadow-sm border border-slate-200 p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4">
                     
+                    {/* --- PERIODE AKADEMIK --- */}
+                    {activeTab === 'academic' && (
+                        <div className="space-y-6">
+                            <SectionHeader title="Periode Akademik" icon={CalendarClock} desc="Tentukan tahun ajaran dan semester aktif saat ini." />
+                            
+                            <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 mb-6 text-sm text-yellow-800 flex items-start gap-3">
+                                <AlertTriangle className="flex-shrink-0 mt-0.5" size={18}/>
+                                <p>Perubahan periode akademik akan mempengaruhi filter default pada semua menu laporan dan input data.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Pelajaran</label>
+                                    <input 
+                                        type="text" 
+                                        name="academicYear" 
+                                        value={form.academicYear} 
+                                        onChange={handleChange} 
+                                        placeholder="Contoh: 2025/2026"
+                                        className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-700"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Semester Aktif</label>
+                                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                                        {['Ganjil', 'Genap'].map(smt => (
+                                            <button
+                                                key={smt} onClick={() => setForm({...form, semester: smt})}
+                                                className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${
+                                                    form.semester === smt 
+                                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                {smt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* --- PROFIL SEKOLAH --- */}
                     {activeTab === 'profile' && (
                         <div className="space-y-6">
@@ -158,6 +203,93 @@ const SchoolSettings = ({ settings, onSave }) => {
                         </div>
                     )}
 
+                    {/* --- LOGO & ASET (UPDATED: WITH LIVE PREVIEW) --- */}
+                    {activeTab === 'assets' && (
+                        <div className="space-y-8">
+                            <SectionHeader title="Logo & Aset Visual" icon={ImageIcon} desc="Upload logo kiri (Pemda/Yayasan) dan logo kanan (Tut Wuri Handayani)." />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <ImageUploader 
+                                    label="Logo Kiri (Pemda/Instansi)" 
+                                    imageValue={form.logo} 
+                                    onFileChange={(e) => handleFile(e, 'logo')} 
+                                    onUrlChange={(e) => handleUrlChange(e, 'logo')} 
+                                    onRemove={() => setForm({...form, logo: ''})}
+                                />
+                                <ImageUploader 
+                                    label="Logo Kanan (Sekolah/Kemdikbud)" 
+                                    imageValue={form.logo2} 
+                                    onFileChange={(e) => handleFile(e, 'logo2')} 
+                                    onUrlChange={(e) => handleUrlChange(e, 'logo2')} 
+                                    onRemove={() => setForm({...form, logo2: ''})}
+                                />
+                            </div>
+
+                            {/* --- LIVE PREVIEW SECTION --- */}
+                            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm mt-4">
+                                <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <Eye size={16} className="text-blue-600"/>
+                                        <h3 className="font-bold text-slate-700 text-sm">Live Preview Kop Surat</h3>
+                                    </div>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tampilan Cetak</span>
+                                </div>
+                                <div className="p-6 bg-slate-100 overflow-x-auto">
+                                    {/* SIMULASI KERTAS */}
+                                    <div className="min-w-[700px] w-full bg-white p-8 shadow-md mx-auto" style={{fontFamily: 'Times New Roman, serif'}}>
+                                        
+                                        {/* KONTEN KOP SURAT */}
+                                        <div className="flex items-center justify-between gap-4 border-b-4 border-double border-black pb-4 mb-2">
+                                            {/* Logo Kiri */}
+                                            <div className="w-24 h-24 flex-shrink-0 flex items-center justify-center">
+                                                {form.logo ? (
+                                                    <img src={form.logo} alt="Logo 1" className="w-full h-full object-contain"/>
+                                                ) : (
+                                                    <div className="w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-[10px] text-slate-400 text-center p-1 font-sans">
+                                                        Logo Kiri
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Teks Tengah */}
+                                            <div className="flex-1 text-center text-slate-900">
+                                                <h3 className="text-lg uppercase tracking-wide leading-tight">
+                                                    {form.government || <span className="text-slate-300 bg-slate-50 px-2 italic text-sm">Pemprov / Yayasan...</span>}
+                                                </h3>
+                                                <h3 className="text-lg font-bold uppercase tracking-wide leading-tight">
+                                                    {form.department || <span className="text-slate-300 bg-slate-50 px-2 italic text-sm">Nama Dinas...</span>}
+                                                </h3>
+                                                <h2 className="text-2xl font-black uppercase tracking-wider my-1 leading-none">
+                                                    {form.name || <span className="text-slate-300 bg-slate-50 px-2 italic text-lg">NAMA SEKOLAH...</span>}
+                                                </h2>
+                                                <p className="text-sm leading-tight">
+                                                    {form.address || <span className="text-slate-300 bg-slate-50 px-2 italic">Alamat Lengkap Sekolah...</span>}
+                                                </p>
+                                                <p className="text-xs italic mt-1 text-slate-600">
+                                                    {form.address2 || <span className="text-slate-300 bg-slate-50 px-2">Kontak / Email / Website...</span>}
+                                                </p>
+                                            </div>
+
+                                            {/* Logo Kanan */}
+                                            <div className="w-24 h-24 flex-shrink-0 flex items-center justify-center">
+                                                {form.logo2 ? (
+                                                    <img src={form.logo2} alt="Logo 2" className="w-full h-full object-contain"/>
+                                                ) : (
+                                                    <div className="w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-[10px] text-slate-400 text-center p-1 font-sans">
+                                                        Logo Kanan
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-center text-xs text-slate-400 mt-4 font-sans">
+                                        *Preview ini mensimulasikan tata letak pada dokumen surat resmi.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* --- PEJABAT --- */}
                     {activeTab === 'officials' && (
                         <div className="space-y-8">
@@ -182,82 +314,6 @@ const SchoolSettings = ({ settings, onSave }) => {
                                     onChangeName={(e) => setForm({...form, counselor: e.target.value})}
                                     onChangeNip={(e) => setForm({...form, nipCounselor: e.target.value})}
                                 />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- LOGO & ASET (UPDATED: URL OR UPLOAD) --- */}
-                    {activeTab === 'assets' && (
-                        <div className="space-y-6">
-                            <SectionHeader title="Logo & Aset Visual" icon={ImageIcon} desc="Upload logo kiri (Pemda/Yayasan) dan logo kanan (Tut Wuri Handayani)." />
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <ImageUploader 
-                                    label="Logo Kiri (Pemda/Instansi)" 
-                                    imageValue={form.logo} 
-                                    onFileChange={(e) => handleFile(e, 'logo')} 
-                                    onUrlChange={(e) => handleUrlChange(e, 'logo')} // Handler URL
-                                    onRemove={() => setForm({...form, logo: ''})}
-                                />
-                                <ImageUploader 
-                                    label="Logo Kanan (Sekolah/Kemdikbud)" 
-                                    imageValue={form.logo2} 
-                                    onFileChange={(e) => handleFile(e, 'logo2')} 
-                                    onUrlChange={(e) => handleUrlChange(e, 'logo2')} // Handler URL
-                                    onRemove={() => setForm({...form, logo2: ''})}
-                                />
-                            </div>
-
-                            <div className="mt-6 bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-4 items-center">
-                                <div className="bg-white p-2 rounded shadow-sm border"><LayoutTemplate size={32} className="text-blue-500"/></div>
-                                <div className="text-sm text-slate-600">
-                                    <p className="font-bold text-slate-800">Preview Kop Surat</p>
-                                    <p>Logo akan otomatis diposisikan secara proporsional di kiri dan kanan header surat.</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- PERIODE AKADEMIK --- */}
-                    {activeTab === 'academic' && (
-                        <div className="space-y-6">
-                            <SectionHeader title="Periode Akademik" icon={CalendarClock} desc="Tentukan tahun ajaran dan semester aktif saat ini." />
-                            
-                            <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 mb-6 text-sm text-yellow-800 flex items-start gap-3">
-                                <AlertTriangle className="flex-shrink-0 mt-0.5" size={18}/>
-                                <p>Perubahan periode akademik akan mempengaruhi filter default pada semua menu laporan dan input data.</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Pelajaran</label>
-                                    <select 
-                                        name="academicYear" value={form.academicYear} onChange={handleChange}
-                                        className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-700"
-                                    >
-                                        <option value="2023/2024">2023/2024</option>
-                                        <option value="2024/2025">2024/2025</option>
-                                        <option value="2025/2026">2025/2026</option>
-                                        <option value="2026/2027">2026/2027</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Semester Aktif</label>
-                                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                                        {['Ganjil', 'Genap'].map(smt => (
-                                            <button
-                                                key={smt} onClick={() => setForm({...form, semester: smt})}
-                                                className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${
-                                                    form.semester === smt 
-                                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                                    : 'text-slate-500 hover:text-slate-700'
-                                                }`}
-                                            >
-                                                {smt}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}
@@ -296,9 +352,7 @@ const InputGroup = ({ label, name, value, onChange, placeholder, className, icon
     </div>
 );
 
-// KOMPONEN UPLOAD LOGO YANG DIPERBARUI
 const ImageUploader = ({ label, imageValue, onFileChange, onUrlChange, onRemove }) => {
-    // Cek apakah value adalah base64 (file upload)
     const isBase64 = imageValue?.startsWith('data:');
 
     return (
@@ -312,7 +366,6 @@ const ImageUploader = ({ label, imageValue, onFileChange, onUrlChange, onRemove 
                 )}
             </div>
             
-            {/* AREA PREVIEW GAMBAR */}
             <div 
                 className="relative w-full h-48 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors group overflow-hidden cursor-pointer"
                 onClick={() => !imageValue && document.getElementById(label).click()}
@@ -333,7 +386,6 @@ const ImageUploader = ({ label, imageValue, onFileChange, onUrlChange, onRemove 
                         <span className="text-xs text-slate-400">atau tempel URL di bawah</span>
                     </div>
                 )}
-                {/* Input File Hidden */}
                 <input 
                     id={label}
                     type="file" 
@@ -343,18 +395,17 @@ const ImageUploader = ({ label, imageValue, onFileChange, onUrlChange, onRemove 
                 />
             </div>
 
-            {/* INPUT URL (OPSIONAL) */}
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <LinkIcon size={14} className="text-slate-400" />
                 </div>
                 <input 
                     type="text" 
-                    value={isBase64 ? '' : imageValue} // Kosongkan jika sedang pakai file upload
+                    value={isBase64 ? '' : imageValue} 
                     onChange={onUrlChange}
                     placeholder="Atau tempel URL gambar (https://...)"
                     className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-400"
-                    disabled={isBase64} // Disable jika file uploaded aktif
+                    disabled={isBase64} 
                 />
                 {isBase64 && (
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -400,7 +451,6 @@ const OfficialCard = ({ title, role, nameValue, nipValue, onChangeName, onChange
     </div>
 );
 
-// Icon Helper
 const AlertTriangle = ({size, className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
 );

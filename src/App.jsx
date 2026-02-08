@@ -238,7 +238,7 @@ export default function App() {
                                 </>
                             ) : (
                                 <>
-                                    <Route path="/" element={<GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} />} />
+                                    <Route path="/" element={<GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} settings={mySettings} />} />
                                     <Route path="/students" element={
                                         <StudentManager 
                                             students={students} journals={journals} pointLogs={pointLogs} sanctionRules={sanctionRules} user={appUser}
@@ -265,7 +265,7 @@ export default function App() {
                                             onDelete={(id) => deleteDoc(doc(db, COLLECTION_PATHS.journals, id))}
                                         />
                                     } />
-                                    <Route path="/points" element={<PointManager students={students} pointLogs={pointLogs} masterPoints={masterPoints} sanctionRules={sanctionRules} onAddPoint={(d) => addDoc(collection(db, 'point_logs'), {...d, teacherId: appUser.id})} onUpdatePoint={(d) => updateDoc(doc(db, 'point_logs', d.id), d)} onDeletePoint={(id) => deleteDoc(doc(db, 'point_logs', id))} />} />
+                                    <Route path="/points" element={<PointManager students={students} pointLogs={pointLogs} masterPoints={masterPoints} sanctionRules={sanctionRules} settings={mySettings} onAddPoint={(d) => addDoc(collection(db, 'point_logs'), {...d, teacherId: appUser.id})} onUpdatePoint={(d) => updateDoc(doc(db, 'point_logs', d.id), d)} onDeletePoint={(id) => deleteDoc(doc(db, 'point_logs', id))} />} />
                                     <Route path="/point-book" element={<StudentPointBook students={students} pointLogs={pointLogs} journals={journals} settings={mySettings} sanctionRules={sanctionRules} />} />
                                     <Route path="/sanction-book" element={<SanctionBook students={students} pointLogs={pointLogs} sanctionRules={sanctionRules} settings={mySettings} />} />
                                     <Route path="/counseling-history" element={<CounselingHistory students={students} journals={journals} settings={mySettings} user={appUser} />} />
