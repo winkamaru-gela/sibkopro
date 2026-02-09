@@ -1,13 +1,32 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     Printer, Users, BookOpen, Map, FileText, FileCheck, 
-    Filter, ChevronRight, ChevronDown, Eye, Search, X, Calendar, List
+    ChevronRight, ChevronDown, Eye, Search, X, Info
 } from 'lucide-react';
 import { formatIndoDate } from '../utils/helpers';
 
 // ==========================================
-// 1. KOMPONEN PORTAL PRATINJAU (TETAP SAMA)
+// 1. DATA KONSTANTA & HELPER
+// ==========================================
+const MONTH_NAMES = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+// Helper: Hitung Semester & Tahun Ajaran Otomatis
+const getAcademicPeriod = (monthIndex, year) => {
+    // Juli (6) s.d Desember (11) -> Semester Ganjil, Tahun Ajaran: YYYY / YYYY+1
+    // Januari (0) s.d Juni (5)   -> Semester Genap, Tahun Ajaran: YYYY-1 / YYYY
+    if (monthIndex >= 6) { 
+        return { semester: 'Ganjil', academicYear: `${year}/${year + 1}` };
+    } else {
+        return { semester: 'Genap', academicYear: `${year - 1}/${year}` };
+    }
+};
+
+// ==========================================
+// 2. KOMPONEN PORTAL PRATINJAU
 // ==========================================
 const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
@@ -36,7 +55,7 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
                         <Printer size={20} className="text-blue-400"/> Pratinjau: {title}
                     </h2>
                     <p className="text-[10px] text-slate-400 hidden sm:block">
-                        Gunakan kertas A4/F4 pada pengaturan printer.
+                        Pastikan orientasi kertas (Portrait/Landscape) sesuai kebutuhan di pengaturan printer.
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -58,44 +77,70 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
 };
 
 // ==========================================
-// 2. KOMPONEN UTAMA
+// 3. KOMPONEN UTAMA
 // ==========================================
-const Reports = ({ journals, students, settings }) => {
+const Reports = ({ journals = [], students = [], settings = {} }) => {
     const [activeTab, setActiveTab] = useState('journal');
     const [showPreview, setShowPreview] = useState(false);
 
-    // --- GLOBAL FILTER STATE ---
-    const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
-    const [filterSemester, setFilterSemester] = useState(settings?.semester || 'Ganjil');
-    const [filterYear, setFilterYear] = useState(settings?.academicYear || '2024/2025');
+    // --- FILTER STATE ---
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // YYYY
     
-    // --- STATE KHUSUS LAPORAN KLASIKAL ---
+    // --- STATE FILTER LAINNYA ---
     const [filterClass, setFilterClass] = useState(''); 
-
-    // --- STATE KHUSUS REKAM JEJAK ---
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [studentSearch, setStudentSearch] = useState('');
     const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
-
-    // --- STATE KHUSUS BUKTI LAYANAN ---
     const [selectedJournalId, setSelectedJournalId] = useState('');
     const [proofFilterMode, setProofFilterMode] = useState('month'); 
     const [proofDate, setProofDate] = useState(new Date().toISOString().slice(0, 7));
     const [proofSearch, setProofSearch] = useState('');
+    const [filterRisk, setFilterRisk] = useState('all'); 
+    const [filterRiskClass, setFilterRiskClass] = useState(''); 
 
-    // --- STATE KHUSUS PETA KERAWANAN ---
-    const [filterRisk, setFilterRisk] = useState('all'); // all, high, medium, low
-    const [filterRiskClass, setFilterRiskClass] = useState(''); // Filter Kelas untuk Peta Kerawanan
+    // --- MEMOIZED: DATA TAHUN DINAMIS ---
+    // Inilah kunci agar tahun tidak terbatas 2021-2031
+    const dynamicYearOptions = useMemo(() => {
+        const currYear = new Date().getFullYear();
+        
+        // 1. Ambil semua tahun yang ada di data jurnal
+        const existingYears = (journals || []).map(j => {
+            const d = new Date(j.date);
+            return !isNaN(d.getFullYear()) ? d.getFullYear() : null;
+        }).filter(y => y !== null);
 
-    // --- MEMOIZED DATA ---
-    const uniqueClasses = useMemo(() => [...new Set(students.map(s => s.class))].sort(), [students]);
+        // 2. Tentukan Range
+        // Min: Tahun terlama di data ATAU 5 tahun lalu (mana yang lebih kecil)
+        const minYear = Math.min(...existingYears, currYear - 5);
+        
+        // Max: Tahun terbaru di data ATAU 5 tahun ke depan (mana yang lebih besar)
+        const maxYear = Math.max(...existingYears, currYear + 5);
+
+        // 3. Buat Array Range
+        const years = [];
+        for (let y = minYear; y <= maxYear; y++) {
+            years.push(y);
+        }
+        
+        // Urutkan (Tahun terbaru di bawah/akhir agar di dropdown urut, atau dibalik jika mau terbaru di atas)
+        // Disini kita urutkan Ascending (Lama -> Baru) agar dropdown rapi
+        return years.sort((a, b) => a - b);
+    }, [journals]);
+
+    // --- MEMOIZED DATA LAINNYA ---
+    const uniqueClasses = useMemo(() => {
+        if (!students) return [];
+        return [...new Set(students.map(s => s.class))].sort();
+    }, [students]);
     
     const filteredStudents = useMemo(() => {
-        if (!studentSearch) return [];
+        if (!students || !studentSearch) return [];
         return students.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase())).slice(0, 10);
     }, [students, studentSearch]);
 
     const filteredJournalsForProof = useMemo(() => {
+        if (!journals) return [];
         return journals.filter(j => {
             let dateMatch = true;
             if (proofFilterMode === 'month') dateMatch = j.date.startsWith(proofDate);
@@ -121,25 +166,50 @@ const Reports = ({ journals, students, settings }) => {
     // Helper: Render Dokumen untuk Cetak
     const renderDocumentContent = () => {
         switch(activeTab) {
-            case 'journal': return <JournalContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} settings={settings} />;
-            case 'classReport': return <ClassReportContent journals={journals} month={filterMonth} semester={filterSemester} year={filterYear} filterClass={filterClass} settings={settings} />;
-            case 'individual': return <IndividualContent journals={journals} students={students} studentId={selectedStudentId} settings={settings} />;
+            case 'journal': 
+                return <JournalContent 
+                    journals={journals} 
+                    selectedMonth={selectedMonth} 
+                    selectedYear={selectedYear} 
+                    settings={settings} 
+                />;
+            case 'classReport': 
+                return <ClassReportContent 
+                    journals={journals} 
+                    selectedMonth={selectedMonth} 
+                    selectedYear={selectedYear} 
+                    filterClass={filterClass} 
+                    settings={settings} 
+                />;
+            case 'individual': 
+                return <IndividualContent 
+                    journals={journals} 
+                    students={students} 
+                    studentId={selectedStudentId} 
+                    settings={settings} 
+                />;
             case 'riskMap': 
                 return <RiskMapContent 
-                            students={students} 
-                            year={filterYear} 
-                            settings={settings} 
-                            filterRisk={filterRisk} 
-                            filterRiskClass={filterRiskClass} 
-                        />;
-            case 'serviceProof': return <ServiceProofContent journals={journals} journalId={selectedJournalId} settings={settings} />;
+                    students={students} 
+                    year={`${selectedYear}/${selectedYear+1}`} 
+                    settings={settings} 
+                    filterRisk={filterRisk} 
+                    filterRiskClass={filterRiskClass} 
+                />;
+            case 'serviceProof': 
+                return <ServiceProofContent 
+                    journals={journals} 
+                    journalId={selectedJournalId} 
+                    settings={settings} 
+                />;
             default: return null;
         }
     };
 
-    // Helper: Render Form Filter (Side Panel)
+    // Helper: Render Form Filter
     const renderFilterForm = () => {
         const currentType = REPORT_TYPES.find(t => t.id === activeTab);
+        const { semester, academicYear } = getAcademicPeriod(selectedMonth, selectedYear);
         
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -149,42 +219,72 @@ const Reports = ({ journals, students, settings }) => {
                         <p className="text-sm text-slate-500">Atur filter data sebelum mencetak dokumen.</p>
                     </div>
 
-                    {/* FORM FILTER */}
                     <div className="grid grid-cols-1 gap-6 mb-6">
-                        
+                        {/* --- FILTER JURNAL & KLASIKAL (DIPERBARUI) --- */}
                         {(activeTab === 'journal' || activeTab === 'classReport') && (
                             <>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Periode Bulan</label>
-                                    <input type="month" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Bulan</label>
+                                        <div className="relative">
+                                            <select 
+                                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
+                                                value={selectedMonth}
+                                                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                            >
+                                                {MONTH_NAMES.map((m, idx) => (
+                                                    <option key={idx} value={idx}>{m}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16}/>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tahun</label>
+                                        <div className="relative">
+                                            <select 
+                                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
+                                                value={selectedYear}
+                                                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                            >
+                                                {dynamicYearOptions.map((y) => (
+                                                    <option key={y} value={y}>{y}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16}/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info Otomatis Semester */}
+                                <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg flex flex-col gap-1 text-xs text-blue-800">
+                                    <div className="font-bold flex items-center gap-2">
+                                        <Info size={14}/> Info Periode Laporan:
+                                    </div>
+                                    <div>Semester: <b>{semester}</b></div>
+                                    <div>Tahun Pelajaran: <b>{academicYear}</b></div>
                                 </div>
                                 
                                 {activeTab === 'classReport' && (
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Kelas (Opsional)</label>
-                                        <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
-                                            <option value="">-- Semua Kelas --</option>
-                                            {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                        <div className="relative">
+                                            <select 
+                                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500" 
+                                                value={filterClass} 
+                                                onChange={e => setFilterClass(e.target.value)}
+                                            >
+                                                <option value="">-- Semua Kelas --</option>
+                                                {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16}/>
+                                        </div>
                                     </div>
                                 )}
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Semester</label>
-                                        <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
-                                            <option value="Ganjil">Ganjil</option>
-                                            <option value="Genap">Genap</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tahun</label>
-                                        <input className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterYear} onChange={e => setFilterYear(e.target.value)} />
-                                    </div>
-                                </div>
                             </>
                         )}
 
+                        {/* --- FILTER INDIVIDUAL --- */}
                         {activeTab === 'individual' && (
                             <div className="relative">
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cari Nama Siswa</label>
@@ -229,6 +329,7 @@ const Reports = ({ journals, students, settings }) => {
                             </div>
                         )}
 
+                        {/* --- FILTER BUKTI LAYANAN --- */}
                         {activeTab === 'serviceProof' && (
                             <div className="space-y-4">
                                 <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -289,18 +390,17 @@ const Reports = ({ journals, students, settings }) => {
                             </div>
                         )}
                         
-                        {/* 4. FILTER PETA KERAWANAN (UPDATED) */}
+                        {/* --- FILTER RISK MAP --- */}
                         {activeTab === 'riskMap' && (
                             <div className="space-y-4">
                                 <div className="bg-blue-50 text-blue-700 p-3 rounded text-sm">
                                     Dokumen ini akan mencetak data siswa yang dikelompokkan per kelas dan diurutkan berdasarkan kerawanan.
                                 </div>
                                 
-                                {/* Filter Tingkat Kerawanan */}
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Tingkat Kerawanan</label>
                                     <select 
-                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50"
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 outline-none"
                                         value={filterRisk}
                                         onChange={e => setFilterRisk(e.target.value)}
                                     >
@@ -311,11 +411,10 @@ const Reports = ({ journals, students, settings }) => {
                                     </select>
                                 </div>
 
-                                {/* Filter Kelas (BARU) */}
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filter Kelas</label>
                                     <select 
-                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50"
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 outline-none"
                                         value={filterRiskClass}
                                         onChange={e => setFilterRiskClass(e.target.value)}
                                     >
@@ -455,22 +554,24 @@ const Reports = ({ journals, students, settings }) => {
 };
 
 // ==========================================
-// 3. KONTEN DOKUMEN CETAK
+// 4. KONTEN DOKUMEN CETAK
 // ==========================================
 
-const JournalContent = ({ journals, month, semester, year, settings }) => {
-    const data = journals.filter(j => 
-        j.date.startsWith(month) && 
-        (!j.semester || j.semester === semester) &&
-        (!j.academicYear || j.academicYear === year)
-    ).sort((a,b) => a.date.localeCompare(b.date));
+const JournalContent = ({ journals = [], selectedMonth, selectedYear, settings }) => {
+    const { semester, academicYear } = getAcademicPeriod(selectedMonth, selectedYear);
+    const monthName = MONTH_NAMES[selectedMonth];
+
+    const data = journals.filter(j => {
+        const d = new Date(j.date);
+        return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+    }).sort((a,b) => new Date(a.date) - new Date(b.date));
 
     return (
         <div className="text-sm">
             <KopSurat settings={settings} />
             <div className="text-center mb-6">
                 <h3 className="text-lg font-bold underline uppercase">JURNAL KEGIATAN BIMBINGAN DAN KONSELING</h3>
-                <p className="text-sm mt-1">Bulan: {new Date(month).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} | Semester: {semester} {year}</p>
+                <p className="text-sm mt-1">Bulan: {monthName} {selectedYear} | Semester: {semester} {academicYear}</p>
             </div>
             <table className="w-full border-collapse border border-black text-xs">
                 <thead>
@@ -503,19 +604,22 @@ const JournalContent = ({ journals, month, semester, year, settings }) => {
                     {data.length === 0 && <tr><td colSpan="6" className="border border-black p-8 text-center italic">Tidak ada data jurnal pada periode ini.</td></tr>}
                 </tbody>
             </table>
-            <SignatureSection settings={settings} />
+            <SignatureSection settings={settings} dateLabel={`${settings?.city || '...'}, ${new Date(selectedYear, selectedMonth + 1, 0).getDate()} ${monthName} ${selectedYear}`} />
         </div>
     );
 };
 
-const ClassReportContent = ({ journals, month, semester, year, filterClass, settings }) => {
-    const data = journals.filter(j => 
-        j.date.startsWith(month) && 
-        j.serviceType === 'Bimbingan Klasikal' &&
-        (!j.semester || j.semester === semester) &&
-        (!j.academicYear || j.academicYear === year) &&
-        (!filterClass || j.studentName.includes(filterClass) || j.targetClass === filterClass)
-    ).sort((a,b) => a.date.localeCompare(b.date));
+const ClassReportContent = ({ journals = [], selectedMonth, selectedYear, filterClass, settings }) => {
+    const { semester, academicYear } = getAcademicPeriod(selectedMonth, selectedYear);
+    const monthName = MONTH_NAMES[selectedMonth];
+
+    const data = journals.filter(j => {
+        const d = new Date(j.date);
+        return d.getMonth() === selectedMonth && 
+               d.getFullYear() === selectedYear &&
+               j.serviceType === 'Bimbingan Klasikal' &&
+               (!filterClass || j.studentName.includes(filterClass) || j.targetClass === filterClass)
+    }).sort((a,b) => new Date(a.date) - new Date(b.date));
 
     return (
         <div className="text-sm">
@@ -523,9 +627,10 @@ const ClassReportContent = ({ journals, month, semester, year, filterClass, sett
             <div className="text-center mb-6">
                 <h3 className="text-lg font-bold underline uppercase">LAPORAN LAYANAN KLASIKAL</h3>
                 <p className="text-sm mt-1">
-                    Bulan: {new Date(month).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} 
+                    Bulan: {monthName} {selectedYear} 
                     {filterClass && <span> | Kelas: {filterClass}</span>}
                 </p>
+                <p className="text-xs">Semester {semester} T.A {academicYear}</p>
             </div>
             <table className="w-full border-collapse border border-black text-xs">
                 <thead>
@@ -560,12 +665,12 @@ const ClassReportContent = ({ journals, month, semester, year, filterClass, sett
                     {data.length === 0 && <tr><td colSpan="6" className="border border-black p-8 text-center italic">Tidak ada data klasikal.</td></tr>}
                 </tbody>
             </table>
-            <SignatureSection settings={settings} />
+            <SignatureSection settings={settings} dateLabel={`${settings?.city || '...'}, ${new Date(selectedYear, selectedMonth + 1, 0).getDate()} ${monthName} ${selectedYear}`} />
         </div>
     );
 };
 
-const IndividualContent = ({ journals, students, studentId, settings }) => {
+const IndividualContent = ({ journals = [], students = [], studentId, settings }) => {
     const student = students.find(s => s.id === studentId);
     if (!student) return null;
 
@@ -618,20 +723,17 @@ const IndividualContent = ({ journals, students, studentId, settings }) => {
     );
 };
 
-// =========================================================
-// 4. RISK MAP CONTENT (DIPERBARUI: FILTER & GROUPING)
-// =========================================================
-const RiskMapContent = ({ students, year, settings, filterRisk, filterRiskClass }) => {
-    // 1. Grouping dan Filtering
+const RiskMapContent = ({ students = [], year, settings, filterRisk, filterRiskClass }) => {
     const { grouped, sortedClassNames, totalStudents } = useMemo(() => {
-        // Filter by Risk & Class
+        // Safe check
+        if (!students) return { grouped: {}, sortedClassNames: [], totalStudents: 0 };
+
         const filtered = students.filter(s => {
             const riskMatch = filterRisk === 'all' || (s.riskLevel || 'Low').toLowerCase() === filterRisk.toLowerCase();
             const classMatch = !filterRiskClass || s.class === filterRiskClass;
             return riskMatch && classMatch;
         });
 
-        // Group by Class
         const groups = {};
         filtered.forEach(s => {
             const cls = s.class || 'Tanpa Kelas';
@@ -639,10 +741,8 @@ const RiskMapContent = ({ students, year, settings, filterRisk, filterRiskClass 
             groups[cls].push(s);
         });
 
-        // Sort Class Names
         const classNames = Object.keys(groups).sort();
 
-        // Sort Students inside Class (High Risk First)
         classNames.forEach(cls => {
             groups[cls].sort((a,b) => {
                 const riskVal = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
@@ -668,7 +768,6 @@ const RiskMapContent = ({ students, year, settings, filterRisk, filterRiskClass 
                 </div>
             </div>
 
-            {/* Render Tabel Per Kelas */}
             {sortedClassNames.length > 0 ? (
                 <div className="space-y-6">
                     {sortedClassNames.map(className => (
@@ -721,7 +820,7 @@ const RiskMapContent = ({ students, year, settings, filterRisk, filterRiskClass 
     );
 };
 
-const ServiceProofContent = ({ journals, journalId, settings }) => {
+const ServiceProofContent = ({ journals = [], journalId, settings }) => {
     const j = journals.find(x => x.id === journalId);
     if (!j) return null;
 
@@ -799,7 +898,7 @@ const SignatureSection = ({ settings, dateLabel }) => (
             <p>NIP. {settings?.nipHeadmaster || '......................'}</p>
         </div>
         <div>
-            <p>{settings?.city || '...'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p>{dateLabel || `${settings?.city || '...'}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`}</p>
             <p>Guru BK / Konselor</p>
             <br/><br/><br/><br/>
             <p className="font-bold underline">{settings?.counselor || '......................'}</p>

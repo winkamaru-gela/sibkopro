@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// 1. Tambahkan 'settings' pada props
 const GuruDashboard = ({ students = [], pointLogs = [], journals = [], user, settings }) => {
     const navigate = useNavigate();
     
@@ -86,18 +85,32 @@ const GuruDashboard = ({ students = [], pointLogs = [], journals = [], user, set
             .slice(0, 5); 
     }, [pointLogs, students]);
 
-    // --- AKTIVITAS TERBARU ---
+    // --- AKTIVITAS TERBARU (DIPERBAIKI) ---
     const recentActivities = useMemo(() => {
-        const logs = pointLogs.slice(-5).reverse().map(l => ({
-            type: l.type === 'violation' ? 'violation' : 'achievement',
-            title: l.type === 'violation' ? 'Pelanggaran Dicatat' : 'Prestasi Dicatat',
-            desc: `${l.studentName} - ${l.desc}`,
-            time: 'Baru saja', 
-            icon: l.type === 'violation' ? AlertTriangle : Trophy,
-            color: l.type === 'violation' ? 'text-red-500 bg-red-50' : 'text-green-500 bg-green-50'
-        }));
+        // Ambil 5 log terakhir, balik urutan biar yang baru di atas
+        const logs = pointLogs.slice(-5).reverse().map(l => {
+            // 1. Cari Nama Siswa dari data students berdasarkan ID (Biar aman dari undefined)
+            const student = students.find(s => s.id === l.studentId);
+            const studentName = student ? student.name : (l.studentName || 'Siswa Tidak Dikenal');
+
+            // 2. Ambil Deskripsi (Cek 'description' dulu, baru 'desc', lalu default strip)
+            const description = l.description || l.desc || '-';
+
+            // 3. Format Tanggal (Opsional: biar 'Baru saja' jadi tanggal asli)
+            // const time = new Date(l.date).toLocaleDateString('id-ID'); 
+            
+            return {
+                type: l.type === 'violation' ? 'violation' : 'achievement',
+                title: l.type === 'violation' ? 'Pelanggaran Dicatat' : 'Prestasi Dicatat',
+                // Gabungkan Nama dan Deskripsi yang sudah dipastikan ada isinya
+                desc: `${studentName} - ${description}`,
+                time: 'Baru saja', // Bisa diganti variabel time di atas jika mau tanggal
+                icon: l.type === 'violation' ? AlertTriangle : Trophy,
+                color: l.type === 'violation' ? 'text-red-500 bg-red-50' : 'text-green-500 bg-green-50'
+            };
+        });
         return logs;
-    }, [pointLogs]);
+    }, [pointLogs, students]);
 
     return (
         <div className="p-4 md:p-8 space-y-8 bg-slate-50 min-h-screen pb-20 animate-in fade-in">
@@ -116,7 +129,6 @@ const GuruDashboard = ({ students = [], pointLogs = [], journals = [], user, set
                     <div className="text-sm font-bold text-slate-700">
                         {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
-                    {/* 2. Gunakan data dinamis dari Settings */}
                     <div className="text-xs text-slate-400">
                         Tahun Ajaran {settings?.academicYear || '...'} - Semester {settings?.semester || '...'}
                     </div>
@@ -198,8 +210,10 @@ const GuruDashboard = ({ students = [], pointLogs = [], journals = [], user, set
                                 </h3>
                                 <p className="text-xs text-slate-400 mt-1">Top 5 siswa dengan akumulasi poin tertinggi</p>
                             </div>
+                            
+                            {/* TOMBOL LIHAT SEMUA MENGARAH KE BUKU SANKSI */}
                             <button 
-                                onClick={() => navigate('/sanctions')}
+                                onClick={() => navigate('/sanction-book')}
                                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
                             >
                                 Lihat Semua <ArrowRight size={14}/>

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Editor } from '@tinymce/tinymce-react';
 import { FileText, Printer, Search, Settings, AlertCircle, ArrowLeft } from 'lucide-react';
 import { formatIndoDate } from '../../utils/helpers';
+// getViolationListHTML dihapus penggunaannya sesuai request, tapi import dibiarkan jika masih dibutuhkan module lain
 import { getViolationListHTML } from '../../utils/letterUtils';
 import LetterPrintModal from './LetterPrintModal';
 
@@ -44,16 +45,20 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
 
         let content = template.body;
 
-        // 1. Ambil Data Log
+        // 1. Ambil Data Log & Urutkan berdasarkan Tanggal Terbaru (Descending)
         const logs = (pointLogs || []).filter(l => l.studentId === selectedStudentId);
-        const violations = logs.filter(l => l.type === 'violation');
+        
+        // Filter violation dan sort: Terbaru (index 0) ke Terlama
+        const violations = logs
+            .filter(l => l.type === 'violation')
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // 2. Hitung Poin
+        // 2. Hitung Poin (Akumulasi Total)
         const vTotal = violations.reduce((a, b) => a + parseInt(b.value || 0), 0);
         const aTotal = logs.filter(l => l.type === 'achievement').reduce((a, b) => a + parseInt(b.value || 0), 0);
         const currentNetScore = vTotal - aTotal;
 
-        // 3. Tentukan Sanksi
+        // 3. Tentukan Sanksi (Berdasarkan total poin saat ini)
         const activeRule = (sanctionRules || [])
             .sort((a,b) => b.max - a.max) 
             .find(rule => currentNetScore >= rule.min && currentNetScore <= rule.max);
@@ -62,30 +67,36 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
             ? `${activeRule.penalty || activeRule.action} (Kategori: ${activeRule.min}-${activeRule.max} Poin)` 
             : "Dalam Pembinaan";
 
-        const violationListHtml = getViolationListHTML(selectedStudentId, pointLogs, sanctionRules);
+        // 4. [LOGIKA BARU] Ambil Data Pelanggaran TERAKHIR (Kejadian Saat Ini)
+        // Mengambil index ke-0 karena sudah di-sort descending
+        const latestViolation = violations.length > 0 ? violations[0] : null;
 
-        // 4. [BARU] EKSTRAK KODE & JENIS PELANGGARAN (UNIK)
-        // Mengambil daftar kode unik (misal: "A01, B03")
-        const uniqueCodes = [...new Set(violations.map(v => v.code).filter(c => c))].join(', ');
+        let lastCode = '-';
+        let lastType = '-';
+        let lastDate = '-';
 
-        // Mengambil deskripsi pelanggaran unik (misal: "Terlambat, Merokok")
-        const uniqueTypes = [...new Set(violations.map(v => {
-            let desc = v.description || '';
-            // Bersihkan jika deskripsi mengandung kode di depannya (misal "A01 - Terlambat")
-            if (v.code && desc.startsWith(v.code)) {
-                desc = desc.replace(`${v.code} - `, '').replace(`${v.code}-`, '').trim();
+        if (latestViolation) {
+            // Kode Pelanggaran
+            lastCode = latestViolation.code || '-';
+            
+            // Jenis Pelanggaran (Bersihkan kode jika ada di deskripsi)
+            let desc = latestViolation.description || '';
+            if (latestViolation.code && desc.startsWith(latestViolation.code)) {
+                desc = desc.replace(`${latestViolation.code} - `, '').replace(`${latestViolation.code}-`, '').trim();
             }
-            return desc;
-        }).filter(d => d))].join(', ');
-
+            lastType = desc;
+            
+            // Tanggal Kejadian
+            lastDate = formatIndoDate(latestViolation.date);
+        }
 
         // 5. Setup Logo
         const imgLogoKiri = settings.logo ? `<img src="${settings.logo}" style="height: 80px; width: auto; object-fit: contain;" alt="Logo"/>` : '';
         const imgLogoKanan = settings.logo2 ? `<img src="${settings.logo2}" style="height: 80px; width: auto; object-fit: contain;" alt="Logo 2"/>` : '';
 
-        // 6. Replace Variabel
+        // 6. Replace Variabel (Sesuai Permintaan Terbaru)
         const replacers = {
-            // Data Kop
+            // --- Data Kop Surat ---
             '[LOGO_KIRI]': imgLogoKiri,
             '[LOGO_KANAN]': imgLogoKanan,
             '[NAMA_PEMERINTAH]': settings.government || '',
@@ -93,10 +104,13 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
             '[NAMA_SEKOLAH]': settings.name || 'Nama Sekolah',
             '[ALAMAT_1]': settings.address || '',
             '[ALAMAT_2]': settings.address2 || settings.website || '', 
-            '[ALAMAT_SEKOLAH]': settings.address || '', 
+            
+            // --- Data Surat (Kota dipindah ke sini) ---
+            '[NOMOR_SURAT]': letterNumber,
             '[KOTA_SEKOLAH]': settings.city || '', 
+            '[TANGGAL_SEKARANG]': formatIndoDate(new Date().toISOString()),
 
-            // Data Siswa
+            // --- Data Siswa ---
             '[NAMA_SISWA]': student.name,
             '[KELAS]': student.class,
             '[NISN]': student.nisn || '-',
@@ -104,28 +118,31 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
             '[ALAMAT]': student.address || 'Di Tempat',
             '[HP_ORANGTUA]': student.parentPhone || '-',
             
-            // Pelanggaran & Sanksi
+            // --- Pelanggaran & Sanksi ---
             '[TOTAL_POIN]': currentNetScore, 
             '[SANKSI_SAAT_INI]': sanctionText,
-            '[LIST_PELANGGARAN]': violationListHtml, 
-            '[KODE_PELANGGARAN]': uniqueCodes || '-', // <--- BARU
-            '[JENIS_PELANGGARAN]': uniqueTypes || '-', // <--- BARU
-
-            // Surat & Tanggal
-            '[NOMOR_SURAT]': letterNumber,
-            '[TANGGAL_SEKARANG]': formatIndoDate(new Date().toISOString()),
+            '[LIST_PELANGGARAN]': '', // Dikosongkan sesuai permintaan
             
-            // Pejabat
+            // Variabel Kejadian Terakhir
+            '[KODE_PELANGGARAN]': lastCode, 
+            '[JENIS_PELANGGARAN]': lastType,
+            '[TANGGAL_KEJADIAN]': lastDate,
+
+            // --- Pejabat Sekolah ---
             '[KEPALA_SEKOLAH]': settings.headmaster || '...',
             '[NIP_KEPSEK]': settings.nipHeadmaster || '-',
             '[WAKA_KESISWAAN]': settings.wakaKesiswaan || '...', 
             '[NIP_WAKA]': settings.nipWakaKesiswaan || '-',
             '[GURU_BK]': settings.counselor || user?.fullName || '...',
             '[NIP_GURU]': settings.nipCounselor || '-',
-            '[KOTA]': settings.city || '...', 
+            
+            // Variabel Wali Kelas (Pastikan data tersedia di Data Siswa)
+            '[WALI_KELAS]': student.waliKelas || '...', 
+            '[NIP_WALI_KELAS]': student.nipWaliKelas || '-',
         };
 
         Object.keys(replacers).forEach(key => {
+            // Menggunakan replaceAll agar jika variabel muncul berkali-kali tetap terganti
             content = content.replaceAll(key, replacers[key]);
         });
 
@@ -214,7 +231,7 @@ const LetterCreator = ({ students, templates, settings, pointLogs, sanctionRules
 
                 <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-xs space-y-2 border border-blue-100">
                     <p className="font-bold flex items-center gap-2"><AlertCircle size={14}/> Info:</p>
-                    <p>Gunakan variabel <b>[JENIS_PELANGGARAN]</b> untuk menampilkan daftar pelanggaran dalam satu baris teks.</p>
+                    <p>Gunakan variabel <b>[JENIS_PELANGGARAN]</b> untuk menampilkan jenis pelanggaran <u>terakhir</u> saja.</p>
                 </div>
             </div>
 
