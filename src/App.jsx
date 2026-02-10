@@ -269,7 +269,7 @@ export default function App() {
                                     <Route path="/point-book" element={<StudentPointBook students={students} pointLogs={pointLogs} journals={journals} settings={mySettings} sanctionRules={sanctionRules} />} />
                                     <Route path="/sanction-book" element={<SanctionBook students={students} pointLogs={pointLogs} sanctionRules={sanctionRules} settings={mySettings} />} />
                                     <Route path="/counseling-history" element={<CounselingHistory students={students} journals={journals} settings={mySettings} user={appUser} />} />
-                                    <Route path="/reports" element={<Reports journals={journals} students={students} settings={mySettings} />} />
+                                    <Route path="/reports" element={<Reports journals={journals} students={students} pointLogs={pointLogs} settings={mySettings} />} />
                                     <Route path="/letters" element={
                                         <LetterManager 
                                             students={students} 

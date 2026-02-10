@@ -250,35 +250,71 @@ const CounselingHistoryModal = ({ isOpen, onClose, student, journals, settings, 
         let row1_Left = null, row1_Right = null;
         let row2_Left = null, row2_Right = null, row2_Center = null;
 
-        if (signOptions.homeroom && signOptions.counselor) { row1_Left = p_homeroom; row1_Right = p_counselor; } 
-        else if (signOptions.homeroom) { row1_Right = p_homeroom; } 
-        else if (signOptions.counselor) { row1_Right = p_counselor; }
+        const hasHR = signOptions.homeroom;
+        const hasBK = signOptions.counselor;
+        const hasWK = signOptions.vicePrincipal;
+        const hasKS = signOptions.principal;
 
-        if (signOptions.vicePrincipal && signOptions.principal) { row2_Left = p_vice; row2_Right = p_head; } 
-        else if (signOptions.principal) {
-            if (row1_Left && row1_Right) row2_Center = p_head;
-            else {
-                if (row1_Right) { row1_Left = row1_Right; row1_Right = p_head; } else row1_Right = p_head;
-            }
-        } else if (signOptions.vicePrincipal) {
-            if (row1_Left && row1_Right) row2_Center = p_vice;
-            else {
-                if (row1_Right) { row1_Left = row1_Right; row1_Right = p_vice; } else row1_Right = p_vice;
+        // --- LOGIKA POSISI TANDA TANGAN (SAMA DENGAN POIN) ---
+
+        // 1. SEMUA DIPILIH
+        if (hasHR && hasBK && hasWK && hasKS) {
+            row1_Left = p_homeroom;
+            row1_Right = p_counselor;
+            row2_Left = p_vice;
+            row2_Right = p_head;
+        }
+        // 2. Wali + BK + (Salah satu Atasan)
+        else if (hasHR && hasBK && (hasKS || hasWK)) {
+            row1_Left = p_homeroom;
+            row1_Right = p_counselor;
+            row2_Center = hasKS ? p_head : p_vice;
+        }
+        // 3. Hanya Wali + BK
+        else if (hasHR && hasBK) {
+            row1_Left = p_homeroom;
+            row1_Right = p_counselor;
+        }
+        // 4. BK + (Kepsek ATAU Waka) -> TANPA Wali Kelas
+        // Permintaan: Kepsek di kiri (Mengetahui), BK di kanan
+        else if (hasBK && !hasHR && (hasKS || hasWK)) {
+            row1_Left = hasKS ? p_head : p_vice; 
+            row1_Right = p_counselor;           
+        }
+        // 5. Hanya BK
+        else if (hasBK && !hasHR && !hasWK && !hasKS) {
+            row1_Right = p_counselor;
+        }
+        // Fallback
+        else {
+            if (hasHR && !hasBK) row1_Right = p_homeroom;
+            else if (hasHR && (hasKS || hasWK)) {
+                row1_Left = p_homeroom;
+                row1_Right = hasKS ? p_head : p_vice;
             }
         }
 
-        if (row1_Left) renderSigBlock(row1_Left.title, row1_Left.name, row1_Left.nip, leftX, false);
-        if (row1_Right) renderSigBlock(row1_Right.title, row1_Right.name, row1_Right.nip, rightX, true);
+        // --- RENDER LOGIC ---
+        const isApprover = (obj) => obj === p_head || obj === p_vice;
+
+        if (row1_Left) {
+            if (isApprover(row1_Left)) {
+                doc.text("Mengetahui,", leftX, finalY, { align: 'center' });
+            }
+            renderSigBlock(row1_Left.title, row1_Left.name, row1_Left.nip, leftX, false);
+        }
+        if (row1_Right) {
+            renderSigBlock(row1_Right.title, row1_Right.name, row1_Right.nip, rightX, true);
+        }
 
         if (row2_Left || row2_Right || row2_Center) {
             finalY += 45; 
-            if (row2_Left || row2_Right) {
-                doc.text("Mengetahui,", centerXCoord, finalY - 5, { align: 'center' });
+            doc.text("Mengetahui,", centerXCoord, finalY - 5, { align: 'center' });
+            if (row2_Center) {
+                renderSigBlock(row2_Center.title, row2_Center.name, row2_Center.nip, centerXCoord, false);
+            } else {
                 if (row2_Left) renderSigBlock(row2_Left.title, row2_Left.name, row2_Left.nip, leftX, false);
                 if (row2_Right) renderSigBlock(row2_Right.title, row2_Right.name, row2_Right.nip, rightX, false);
-            } else if (row2_Center) {
-                doc.text("Mengetahui,", centerXCoord, finalY - 5, { align: 'center' });
-                renderSigBlock(row2_Center.title, row2_Center.name, row2_Center.nip, centerXCoord, false);
             }
         }
 
@@ -351,8 +387,8 @@ const CounselingHistoryModal = ({ isOpen, onClose, student, journals, settings, 
                             
                             <div className="w-px h-6 bg-slate-300 mx-1"></div>
                             
-                            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none hover:bg-slate-200 px-2 py-1 rounded transition-colors"><input type="checkbox" checked={signOptions.homeroom} onChange={() => toggleSign('homeroom')} className="rounded text-blue-600 focus:ring-blue-500"/> Wali</label>
-                            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none hover:bg-slate-200 px-2 py-1 rounded transition-colors"><input type="checkbox" checked={signOptions.counselor} onChange={() => toggleSign('counselor')} className="rounded text-blue-600 focus:ring-blue-500"/> BK</label>
+                            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none hover:bg-slate-200 px-2 py-1 rounded transition-colors"><input type="checkbox" checked={signOptions.homeroom} onChange={() => toggleSign('homeroom')} className="rounded text-blue-600 focus:ring-blue-500"/> Wali Kelas</label>
+                            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none hover:bg-slate-200 px-2 py-1 rounded transition-colors"><input type="checkbox" checked={signOptions.counselor} onChange={() => toggleSign('counselor')} className="rounded text-blue-600 focus:ring-blue-500"/> Guru BK</label>
                             <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none hover:bg-slate-200 px-2 py-1 rounded transition-colors"><input type="checkbox" checked={signOptions.vicePrincipal} onChange={() => toggleSign('vicePrincipal')} className="rounded text-blue-600 focus:ring-blue-500"/> Waka</label>
                             <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none hover:bg-slate-200 px-2 py-1 rounded transition-colors"><input type="checkbox" checked={signOptions.principal} onChange={() => toggleSign('principal')} className="rounded text-blue-600 focus:ring-blue-500"/> Kepsek</label>
                         </div>
