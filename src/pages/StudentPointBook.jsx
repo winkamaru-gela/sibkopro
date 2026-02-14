@@ -22,13 +22,39 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
                 @media print {
                     @page { size: auto; margin: 10mm; }
                     #root, .app-container, header, aside, nav { display: none !important; }
-                    html, body { height: auto !important; overflow: visible !important; background-color: white !important; margin: 0 !important; }
+                    
+                    html, body, * { 
+                        font-family: 'Helvetica', 'Arial', sans-serif !important;
+                    }
+
+                    html, body { 
+                        height: auto !important; 
+                        overflow: visible !important; 
+                        background-color: white !important; 
+                        margin: 0 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
                     .print-portal-root { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; z-index: 9999 !important; background-color: white !important; }
                     .print-paper-content { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
                     .print-header-actions { display: none !important; }
                     table { width: 100% !important; border-collapse: collapse !important; }
                     tr { page-break-inside: avoid; }
-                    td, th { border: 1px solid black !important; padding: 4px; color: black !important; }
+                    
+                    /* ATURAN GLOBAL: Semua tabel punya border saat dicetak */
+                    td, th { border: 1px solid black !important; padding: 4px; }
+                    
+                    /* PENGECUALIAN: Tabel Identitas (tanpa border) */
+                    .no-border-table td, .no-border-table th { 
+                        border: none !important; 
+                        padding: 2px 0 !important; 
+                    }
+                    
+                    /* KHUSUS TABEL KONSELING: Lebih Rapat */
+                    .compact-table td {
+                        padding: 2px 4px !important; /* Padding vertikal sangat tipis */
+                    }
+
                     .signature-section { page-break-inside: avoid; }
                 }
             `}</style>
@@ -77,13 +103,10 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
     const searchRef = useRef(null);
 
     // --- OPSI TAMPILAN (TOGGLE SECTIONS) ---
-    const [showSanctionHistory, setShowSanctionHistory] = useState(false); // Default OFF
-    const [showCounselingHistory, setShowCounselingHistory] = useState(true); // Default ON
+    const [showSanctionHistory, setShowSanctionHistory] = useState(false); 
+    const [showCounselingHistory, setShowCounselingHistory] = useState(true); 
 
-    // --- MODE PRIVASI LAYANAN BK (3 OPSI) ---
-    // 'show' = Tampilkan Semua
-    // 'mask' = Samarkan Topik (Default)
-    // 'hide' = Sembunyikan Baris Privasi
+    // --- MODE PRIVASI LAYANAN BK ---
     const [counselingPrivacy, setCounselingPrivacy] = useState('mask');
 
     useEffect(() => {
@@ -121,21 +144,19 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         return { logs, violationTotal, achievementTotal, netScoreRaw, activeSanction };
     }, [student, pointLogs, sanctionRules]);
 
-    // Data Konseling (Filter sesuai Mode 'Hide')
+    // Data Konseling
     const counselingHistory = useMemo(() => {
         if (!student) return [];
         let data = journals.filter(j => 
             j.studentId === student.id || (j.studentIds && j.studentIds.includes(student.id))
         ).sort((a,b) => b.date.localeCompare(a.date));
 
-        // Jika Mode Hide: Buang data yang privasi
         if (counselingPrivacy === 'hide') {
             data = data.filter(j => {
                 const isPrivate = j.isPrivate || (j.serviceType && j.serviceType.toLowerCase().includes('pribadi'));
                 return !isPrivate;
             });
         }
-
         return data;
     }, [student, journals, counselingPrivacy]);
 
@@ -206,7 +227,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
             `;
         }
 
-        // TABEL KONSELING (WORD)
+        // TABEL KONSELING (WORD) - DIBUAT RAPAT
         let counselingTableHTML = '';
         if (showCounselingHistory) {
             const counselingRows = counselingHistory.map((h, i) => {
@@ -217,46 +238,46 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                 
                 return `
                     <tr>
-                        <td style="border: 1px solid black; padding: 5px; text-align: center;">${i+1}</td>
-                        <td style="border: 1px solid black; padding: 5px; text-align: center;">${formatIndoDate(h.date)}</td>
-                        <td style="border: 1px solid black; padding: 5px; vertical-align: top;">
-                            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 4px;">
+                        <td style="border: 1px solid black; padding: 2px 4px; text-align: center;">${i+1}</td>
+                        <td style="border: 1px solid black; padding: 2px 4px; text-align: center;">${formatIndoDate(h.date)}</td>
+                        <td style="border: 1px solid black; padding: 2px 4px; vertical-align: top;">
+                            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">
                                 ${h.serviceType}
                             </div>
-                            <div style="font-size: 11px;">
+                            <div style="font-size: 10px; line-height: 1.2;">
                                 <b>Bidang:</b> ${h.skkpd || '-'}<br/>
                                 <b>Kategori:</b> ${h.category || '-'}<br/>
                                 <b>Teknik:</b> ${h.technique || '-'}
                             </div>
                         </td>
-                        <td style="border: 1px solid black; padding: 5px; vertical-align: top; ${textStyle}">
+                        <td style="border: 1px solid black; padding: 2px 4px; vertical-align: top; ${textStyle}">
                             ${descText}
                         </td>
-                        <td style="border: 1px solid black; padding: 5px; vertical-align: top;">${h.followUp}</td>
+                        <td style="border: 1px solid black; padding: 2px 4px; vertical-align: top;">${h.followUp}</td>
                     </tr>
                 `;
             }).join('');
             
-            // Info text jika mode mask/hide
             let infoText = '';
             if (counselingPrivacy === 'mask') infoText = '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>';
             if (counselingPrivacy === 'hide') infoText = '<p style="font-size: 10px; font-style: italic; margin-top:0;">*Layanan yang bersifat privasi tidak ditampilkan pada dokumen ini.</p>';
 
+            // UPDATE WIDTH KOLOM LAYANAN (WORD): 230px
             counselingTableHTML = `
                 <h4 style="margin-bottom: 5px; color: #1e40af;">C. RIWAYAT LAYANAN BK</h4>
                 ${infoText}
-                <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;">
+                <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 11px;">
                     <thead>
                         <tr>
-                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 30px;">No</th>
-                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 80px;">Tanggal</th>
-                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 180px;">Jenis & Detail Layanan</th> 
-                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold;">Topik / Masalah</th> 
-                            <th style="border: 1px solid black; padding: 5px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 100px;">Tindak Lanjut</th>
+                            <th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 30px;">No</th>
+                            <th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 80px;">Tanggal</th>
+                            <th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 230px;">Jenis & Detail Layanan</th> 
+                            <th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2; text-align: center; font-weight: bold;">Topik / Masalah</th> 
+                            <th style="border: 1px solid black; padding: 4px; background-color: #f2f2f2; text-align: center; font-weight: bold; width: 100px;">Tindak Lanjut</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${counselingRows || '<tr><td colspan="5" style="border: 1px solid black; padding: 5px; text-align: center; font-style: italic;">Belum ada riwayat layanan.</td></tr>'}
+                        ${counselingRows || '<tr><td colspan="5" style="border: 1px solid black; padding: 4px; text-align: center; font-style: italic;">Belum ada riwayat layanan.</td></tr>'}
                     </tbody>
                 </table>
             `;
@@ -271,7 +292,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
         let htmlContent = `
             <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
             <head><meta charset='utf-8'><title>Buku Poin ${student.name}</title></head>
-            <body style="font-family: Arial, sans-serif; font-size: 12px;">
+            <body style="font-family: 'Helvetica', 'Arial', sans-serif; font-size: 12px;">
                 
                 <div style="text-align: center; margin-bottom: 20px; border-bottom: 3px double black; padding-bottom: 10px;">
                     <h3 style="${kopTextStyle}">${settings?.government || ''}</h3>
@@ -476,50 +497,28 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                             </div>
                             
                             <div className="flex flex-col gap-3">
-                                {/* BARIS 1: TOGGLE BAGIAN UTAMA */}
                                 <div className="flex flex-wrap gap-4">
-                                    {/* Toggle Riwayat Sanksi */}
                                     <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-lg border border-yellow-100 shadow-sm">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 accent-orange-600 rounded" 
-                                            checked={showSanctionHistory} 
-                                            onChange={e => setShowSanctionHistory(e.target.checked)} 
-                                        />
-                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                                            <ListOrdered size={14}/> Sertakan Riwayat Sanksi
-                                        </span>
+                                        <input type="checkbox" className="w-4 h-4 accent-orange-600 rounded" checked={showSanctionHistory} onChange={e => setShowSanctionHistory(e.target.checked)} />
+                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1"><ListOrdered size={14}/> Sertakan Riwayat Sanksi</span>
                                     </label>
-
-                                    {/* Toggle Riwayat BK */}
                                     <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-lg border border-yellow-100 shadow-sm">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 accent-blue-600 rounded" 
-                                            checked={showCounselingHistory} 
-                                            onChange={e => setShowCounselingHistory(e.target.checked)} 
-                                        />
-                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                                            <FileText size={14}/> Sertakan Riwayat BK
-                                        </span>
+                                        <input type="checkbox" className="w-4 h-4 accent-blue-600 rounded" checked={showCounselingHistory} onChange={e => setShowCounselingHistory(e.target.checked)} />
+                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1"><FileText size={14}/> Sertakan Riwayat BK</span>
                                     </label>
                                 </div>
 
-                                {/* BARIS 2: OPSI PRIVASI BK (Hanya Muncul Jika BK Dicawang) */}
                                 {showCounselingHistory && (
                                     <div className="flex flex-col sm:flex-row gap-2 pl-2 border-l-2 border-slate-300 animate-in fade-in slide-in-from-top-1">
                                         <span className="text-[10px] font-bold text-slate-500 uppercase self-center mr-2">Mode Privasi BK:</span>
-                                        
                                         <label className={`flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded border transition-all ${counselingPrivacy === 'show' ? 'bg-blue-100 border-blue-300' : 'bg-white border-slate-200'}`}>
                                             <input type="radio" name="cp_mode_main" className="w-3 h-3 accent-blue-600" checked={counselingPrivacy === 'show'} onChange={() => setCounselingPrivacy('show')} />
                                             <div className="text-[11px] font-bold flex gap-1 items-center"><Eye size={12}/> Tampilkan</div>
                                         </label>
-                                        
                                         <label className={`flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded border transition-all ${counselingPrivacy === 'mask' ? 'bg-blue-100 border-blue-300' : 'bg-white border-slate-200'}`}>
                                             <input type="radio" name="cp_mode_main" className="w-3 h-3 accent-blue-600" checked={counselingPrivacy === 'mask'} onChange={() => setCounselingPrivacy('mask')} />
                                             <div className="text-[11px] font-bold flex gap-1 items-center"><EyeOff size={12}/> Samarkan</div>
                                         </label>
-                                        
                                         <label className={`flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded border transition-all ${counselingPrivacy === 'hide' ? 'bg-blue-100 border-blue-300' : 'bg-white border-slate-200'}`}>
                                             <input type="radio" name="cp_mode_main" className="w-3 h-3 accent-blue-600" checked={counselingPrivacy === 'hide'} onChange={() => setCounselingPrivacy('hide')} />
                                             <div className="text-[11px] font-bold flex gap-1 items-center"><Trash2 size={12}/> Sembunyikan Baris</div>
@@ -529,7 +528,6 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                             </div>
                         </div>
 
-                        {/* Tampilan Buku */}
                         <div className="bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden min-h-[600px]">
                             <BookContent 
                                 student={student} 
@@ -538,7 +536,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                                 settings={settings}
                                 counselingPrivacy={counselingPrivacy}
                                 showSanctionHistory={showSanctionHistory}
-                                showCounselingHistory={showCounselingHistory} // Pass state ini
+                                showCounselingHistory={showCounselingHistory}
                                 sanctionRules={sanctionRules}
                             />
                         </div>
@@ -551,7 +549,6 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                 )}
             </div>
 
-            {/* MODAL PRATINJAU & CETAK */}
             <PrintPreviewModal 
                 isOpen={showPreview} 
                 onClose={() => setShowPreview(false)} 
@@ -565,7 +562,7 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
                         settings={settings}
                         counselingPrivacy={counselingPrivacy}
                         showSanctionHistory={showSanctionHistory}
-                        showCounselingHistory={showCounselingHistory} // Pass state ini
+                        showCounselingHistory={showCounselingHistory}
                         sanctionRules={sanctionRules}
                         isPrintVersion={true}
                     />
@@ -581,95 +578,70 @@ const StudentPointBook = ({ students, pointLogs, journals, settings, sanctionRul
 // ==========================================
 const BookContent = ({ student, pointData, counselingHistory, settings, counselingPrivacy, showSanctionHistory, showCounselingHistory, sanctionRules, isPrintVersion = false }) => {
     const { violationTotal, achievementTotal, netScoreRaw, activeSanction, logs } = pointData;
-
     const violationLogs = logs.filter(l => l.type === 'violation');
     const achievementLogs = logs.filter(l => l.type === 'achievement');
-
     const isDeficit = violationTotal > achievementTotal;
     const isSurplus = achievementTotal > violationTotal;
     const displayScore = Math.abs(netScoreRaw);
     const scoreColorClass = isDeficit ? 'text-red-600' : (isSurplus ? 'text-green-600' : 'text-slate-800');
 
-    // LOGIKA RIWAYAT SANKSI (KRONOLOGIS)
+    // Font family style
+    const fontStyle = { fontFamily: 'Helvetica, Arial, sans-serif' };
+
+    // LOGIKA RIWAYAT SANKSI
     const sanctionHistoryRows = useMemo(() => {
         if (!showSanctionHistory) return [];
         const chronologicalLogs = [...logs].sort((a,b) => new Date(a.date) - new Date(b.date));
-        
         let runningBalance = 0;
         return chronologicalLogs.map((log) => {
             const val = parseInt(log.value || 0);
             const isV = log.type === 'violation';
-            
-            if (isV) runningBalance += val;
-            else runningBalance -= val;
+            if (isV) runningBalance += val; else runningBalance -= val;
             if (runningBalance < 0) runningBalance = 0;
-
             const rule = (sanctionRules || []).find(r => runningBalance >= parseInt(r.min) && runningBalance <= parseInt(r.max));
-            
-            return {
-                ...log,
-                isViolation: isV,
-                pointVal: val,
-                currentBalance: runningBalance,
-                status: rule ? rule.penalty : '-'
-            };
+            return { ...log, isViolation: isV, pointVal: val, currentBalance: runningBalance, status: rule ? rule.penalty : '-' };
         });
     }, [logs, showSanctionHistory, sanctionRules]);
 
     return (
-        <div className={`text-slate-900 ${isPrintVersion ? 'text-sm' : 'p-8'}`}>
+        <div className={`text-slate-900 ${isPrintVersion ? 'text-sm' : 'p-8'}`} style={fontStyle}>
             
             {/* KOP SURAT */}
-            <div className="flex items-center justify-between border-b-4 border-double border-black pb-4 mb-6">
-                <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                    {settings?.logo && <img src={settings.logo} className="h-full object-contain" alt="Logo" />}
-                </div>
-                
-                <div className="flex-1 text-center px-4 min-w-0">
-                    <h3 className="font-bold text-black text-lg md:text-xl uppercase tracking-wide whitespace-nowrap leading-tight">
-                        {settings?.government || ''}
-                    </h3>
-                    <h3 className="font-bold text-black text-lg md:text-xl uppercase tracking-wide whitespace-nowrap leading-tight">
-                        {settings?.department || ''}
-                    </h3>
-                    <h1 className="font-extrabold text-black text-lg md:text-xl uppercase whitespace-nowrap leading-tight my-1">
-                        {settings?.name || 'NAMA SEKOLAH'}
-                    </h1>
-                    <div className="text-xs text-black font-serif italic leading-tight mt-1">
-                        <p>{settings?.address || 'Alamat Sekolah...'}</p>
-                        {settings?.address2 && <p>{settings.address2}</p>}
+            <div className="mb-6">
+                <div className="grid grid-cols-[80px_1fr_80px] gap-4 items-center mb-2">
+                    <div className="flex justify-center items-center h-20 w-20">
+                        {settings?.logo && <img src={settings.logo} alt="Logo 1" className="max-h-full max-w-full object-contain"/>}
+                    </div>
+                    <div className="text-center">
+                        <h3 className="font-normal text-black uppercase leading-tight text-[12pt]">{settings?.government || 'PEMERINTAH PROVINSI...'}</h3>
+                        <h3 className="font-normal text-black uppercase leading-tight text-[12pt]">{settings?.department || 'DINAS PENDIDIKAN'}</h3>
+                        <h1 className="font-bold text-black uppercase leading-tight my-1 text-[14pt]">{settings?.name || 'NAMA SEKOLAH'}</h1>
+                        <p className="font-normal text-black text-[10pt] leading-tight">{settings?.address || 'Alamat Sekolah...'}</p>
+                        {settings?.address2 && <p className="font-normal italic text-black text-[10pt] leading-tight">{settings.address2}</p>}
+                    </div>
+                    <div className="flex justify-center items-center h-20 w-20">
+                        {settings?.logo2 && <img src={settings.logo2} alt="Logo 2" className="max-h-full max-w-full object-contain"/>}
                     </div>
                 </div>
-                
-                <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                    {settings?.logo2 && <img src={settings.logo2} className="h-full object-contain" alt="Logo" />}
-                </div>
+                <div className="border-b-4 border-double border-black w-full"></div>
             </div>
 
             <div className="text-center mb-8">
-                <h2 className="text-lg font-bold underline uppercase tracking-wide">BUKU CATATAN POIN & PERILAKU SISWA</h2>
+                <h2 className="text-[12pt] font-bold underline uppercase tracking-wide">BUKU CATATAN POIN & PERILAKU SISWA</h2>
             </div>
 
-            {/* IDENTITAS SISWA */}
-            <table className="w-full mb-6 text-sm font-bold">
+            {/* IDENTITAS SISWA (CLASS no-border-table DITAMBAHKAN) */}
+            <table className="w-full mb-6 text-[10pt] font-bold no-border-table">
                 <tbody>
                     <tr><td className="w-32 py-1">Nama Siswa</td><td>: {student.name}</td><td className="w-32">Kelas</td><td>: {student.class}</td></tr>
                     <tr><td className="py-1">NISN</td><td>: {student.nisn || '-'}</td><td>Jenis Kelamin</td><td>: {student.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</td></tr>
-                    <tr>
-                        <td className="py-1">Wali Kelas</td>
-                        <td>: {student.homeroomTeacher || '-'}</td>
-                        <td>Guru Wali</td>
-                        <td>: {student.guardianTeacher || '-'}</td>
-                    </tr>
-                    <tr>
-                        <td className="py-1">Thn Ajaran / Sem</td>
-                        <td colSpan="3">: {settings?.academicYear || '-'} / {settings?.semester || '-'}</td>
-                    </tr>
+                    <tr><td className="py-1">Wali Kelas</td><td>: {student.homeroomTeacher || '-'}</td><td>Guru Wali</td><td>: {student.guardianTeacher || '-'}</td></tr>
+                    <tr><td className="py-1">Thn Ajaran</td><td colSpan="3">: {settings?.academicYear || '-'} / {settings?.semester || '-'}</td></tr>
                 </tbody>
             </table>
 
             {/* RINGKASAN POIN */}
-            <table className="w-full border-collapse border border-black mb-6 text-center text-sm">
+            <table className="w-full border-collapse border border-black mb-6 text-center text-[10pt]">
                 <thead>
                     <tr className="bg-gray-100">
                         <th className="border border-black p-2 w-1/3">Poin Pelanggaran</th>
@@ -681,214 +653,137 @@ const BookContent = ({ student, pointData, counselingHistory, settings, counseli
                     <tr>
                         <td className="border border-black p-2 font-bold text-red-600">{violationTotal}</td>
                         <td className="border border-black p-2 font-bold text-green-600">{achievementTotal}</td>
-                        <td className={`border border-black p-2 font-bold ${scoreColorClass}`}>
-                            {displayScore}
-                        </td>
+                        <td className={`border border-black p-2 font-bold ${scoreColorClass}`}>{displayScore}</td>
                     </tr>
                 </tbody>
             </table>
 
             {/* KETENTUAN SANKSI */}
             {isDeficit && activeSanction && (
-                <div className="mb-8">
-                    <h3 className="font-bold text-sm uppercase mb-2 text-red-700">Tindak Lanjut & Sanksi Saat Ini</h3>
-                    <table className="w-full border-collapse border border-black text-xs">
+                <div className="mb-6">
+                    <h3 className="font-bold text-[10pt] uppercase mb-1 text-red-700">Tindak Lanjut & Sanksi Saat Ini</h3>
+                    <table className="w-full border-collapse border border-black text-[9pt]">
                         <thead>
-                            <tr className="bg-gray-100 text-center">
-                                <th className="border border-black p-1.5 w-24">Range Poin</th>
-                                <th className="border border-black p-1.5">Tindak Lanjut (Guru/Sekolah)</th>
-                                <th className="border border-black p-1.5">Sanksi (Siswa)</th>
-                            </tr>
+                            <tr className="bg-gray-100 text-center"><th className="border border-black p-1">Range</th><th className="border border-black p-1">Tindak Lanjut</th><th className="border border-black p-1">Sanksi</th></tr>
                         </thead>
                         <tbody>
-                            <tr className="bg-yellow-50 font-bold">
-                                <td className="border border-black p-2 text-center text-red-600">{activeSanction.min} - {activeSanction.max}</td>
-                                <td className="border border-black p-2">{activeSanction.action}</td>
-                                <td className="border border-black p-2">{activeSanction.penalty}</td>
-                            </tr>
+                            <tr className="bg-yellow-50 font-bold"><td className="border border-black p-2 text-center text-red-600">{activeSanction.min} - {activeSanction.max}</td><td className="border border-black p-2">{activeSanction.action}</td><td className="border border-black p-2">{activeSanction.penalty}</td></tr>
                         </tbody>
                     </table>
                 </div>
             )}
 
-            {/* RIWAYAT SANKSI (OPSIONAL) */}
+            {/* RIWAYAT SANKSI */}
             {showSanctionHistory && (
-                <div className="mb-8 animate-in fade-in slide-in-from-top-2">
-                    <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-amber-700">
-                        <ListOrdered size={16}/> Riwayat Perubahan Poin & Status Sanksi
-                    </h3>
-                    <table className="w-full border-collapse border border-black text-xs">
+                <div className="mb-6">
+                    <h3 className="font-bold text-[10pt] uppercase border-b border-black pb-1 mb-2 text-amber-700">Riwayat Perubahan Poin</h3>
+                    <table className="w-full border-collapse border border-black text-[9pt]">
                         <thead>
-                            <tr className="bg-amber-50 text-center">
-                                <th className="border border-black p-1.5 w-8">No</th>
-                                <th className="border border-black p-1.5 w-24">Tanggal</th>
-                                <th className="border border-black p-1.5">Keterangan</th>
-                                <th className="border border-black p-1.5 w-16">Ubah</th>
-                                <th className="border border-black p-1.5 w-16">Total</th>
-                                <th className="border border-black p-1.5 w-1/3">Status Sanksi</th>
-                            </tr>
+                            <tr className="bg-amber-50 text-center"><th className="border border-black p-1 w-8">No</th><th className="border border-black p-1 w-20">Tanggal</th><th className="border border-black p-1">Keterangan</th><th className="border border-black p-1 w-12">Ubah</th><th className="border border-black p-1 w-12">Total</th><th className="border border-black p-1">Status</th></tr>
                         </thead>
                         <tbody>
-                            {sanctionHistoryRows.length > 0 ? sanctionHistoryRows.map((row, i) => (
+                            {sanctionHistoryRows.map((row, i) => (
                                 <tr key={i}>
-                                    <td className="border border-black p-1.5 text-center">{i+1}</td>
-                                    <td className="border border-black p-1.5 text-center">{formatIndoDate(row.date)}</td>
-                                    <td className="border border-black p-1.5">
-                                        <div className="font-bold text-[10px] uppercase text-slate-500">{row.isViolation ? 'Pelanggaran' : 'Prestasi'}</div>
-                                        {row.description}
-                                    </td>
-                                    <td className={`border border-black p-1.5 text-center font-bold ${row.isViolation ? 'text-red-600' : 'text-green-600'}`}>
-                                        {row.isViolation ? '+' : '-'}{row.pointVal}
-                                    </td>
-                                    <td className="border border-black p-1.5 text-center font-bold bg-slate-50">{row.currentBalance}</td>
-                                    <td className="border border-black p-1.5 text-center text-[10px]">{row.status}</td>
+                                    <td className="border border-black p-1 text-center">{i+1}</td>
+                                    <td className="border border-black p-1 text-center">{formatIndoDate(row.date)}</td>
+                                    <td className="border border-black p-1"><span className="text-[8pt] text-slate-500 uppercase block">{row.isViolation?'Pelanggaran':'Prestasi'}</span>{row.description}</td>
+                                    <td className={`border border-black p-1 text-center font-bold ${row.isViolation?'text-red-600':'text-green-600'}`}>{row.isViolation?'+':'-'}{row.pointVal}</td>
+                                    <td className="border border-black p-1 text-center font-bold">{row.currentBalance}</td>
+                                    <td className="border border-black p-1 text-[8pt] text-center">{row.status}</td>
                                 </tr>
-                            )) : (
-                                <tr><td colSpan="6" className="border border-black p-4 text-center italic">Belum ada riwayat perubahan poin.</td></tr>
-                            )}
+                            ))}
                         </tbody>
                     </table>
                 </div>
             )}
 
-            {/* A. CATATAN PELANGGARAN */}
+            {/* A. PELANGGARAN */}
             <div className="mb-6">
-                <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-red-700">
-                    <AlertTriangle size={16}/> A. Catatan Pelanggaran
-                </h3>
-                <table className="w-full border-collapse border border-black text-xs">
+                <h3 className="font-bold text-[10pt] uppercase border-b border-black pb-1 mb-2 text-red-700">A. Catatan Pelanggaran</h3>
+                <table className="w-full border-collapse border border-black text-[9pt]">
                     <thead>
-                        <tr className="bg-slate-100 text-center">
-                            <th className="border border-black p-1.5 w-8">No</th>
-                            <th className="border border-black p-1.5 w-24">Tanggal</th>
-                            <th className="border border-black p-1.5">Uraian Pelanggaran</th>
-                            <th className="border border-black p-1.5 w-16">Poin</th>
-                        </tr>
+                        <tr className="bg-slate-100 text-center"><th className="border border-black p-1 w-8">No</th><th className="border border-black p-1 w-24">Tanggal</th><th className="border border-black p-1">Uraian</th><th className="border border-black p-1 w-12">Poin</th></tr>
                     </thead>
                     <tbody>
-                        {violationLogs.length > 0 ? violationLogs.map((log, i) => (
-                            <tr key={log.id}>
-                                <td className="border border-black p-1.5 text-center">{i+1}</td>
-                                <td className="border border-black p-1.5 text-center">{formatIndoDate(log.date)}</td>
-                                <td className="border border-black p-1.5">{log.description}</td>
-                                <td className="border border-black p-1.5 text-center font-bold text-red-600">{log.value}</td>
-                            </tr>
-                        )) : (
-                            <tr><td colSpan="4" className="border border-black p-4 text-center italic">Tidak ada catatan pelanggaran.</td></tr>
-                        )}
+                        {violationLogs.length>0 ? violationLogs.map((log,i)=>(
+                            <tr key={log.id}><td className="border border-black p-1 text-center">{i+1}</td><td className="border border-black p-1 text-center">{formatIndoDate(log.date)}</td><td className="border border-black p-1">{log.description}</td><td className="border border-black p-1 text-center font-bold text-red-600">{log.value}</td></tr>
+                        )) : <tr><td colSpan="4" className="border border-black p-2 text-center italic">Nihil.</td></tr>}
                     </tbody>
                 </table>
             </div>
 
-            {/* B. CATATAN PRESTASI */}
+            {/* B. PRESTASI */}
             <div className="mb-6">
-                <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-green-700">
-                    <Trophy size={16}/> B. Catatan Prestasi
-                </h3>
-                <table className="w-full border-collapse border border-black text-xs">
+                <h3 className="font-bold text-[10pt] uppercase border-b border-black pb-1 mb-2 text-green-700">B. Catatan Prestasi</h3>
+                <table className="w-full border-collapse border border-black text-[9pt]">
                     <thead>
-                        <tr className="bg-slate-100 text-center">
-                            <th className="border border-black p-1.5 w-8">No</th>
-                            <th className="border border-black p-1.5 w-24">Tanggal</th>
-                            <th className="border border-black p-1.5">Uraian Prestasi</th>
-                            <th className="border border-black p-1.5 w-16">Poin</th>
-                        </tr>
+                        <tr className="bg-slate-100 text-center"><th className="border border-black p-1 w-8">No</th><th className="border border-black p-1 w-24">Tanggal</th><th className="border border-black p-1">Uraian</th><th className="border border-black p-1 w-12">Poin</th></tr>
                     </thead>
                     <tbody>
-                        {achievementLogs.length > 0 ? achievementLogs.map((log, i) => (
-                            <tr key={log.id}>
-                                <td className="border border-black p-1.5 text-center">{i+1}</td>
-                                <td className="border border-black p-1.5 text-center">{formatIndoDate(log.date)}</td>
-                                <td className="border border-black p-1.5">{log.description}</td>
-                                <td className="border border-black p-1.5 text-center font-bold text-green-600">{log.value}</td>
-                            </tr>
-                        )) : (
-                            <tr><td colSpan="4" className="border border-black p-4 text-center italic">Tidak ada catatan prestasi.</td></tr>
-                        )}
+                        {achievementLogs.length>0 ? achievementLogs.map((log,i)=>(
+                            <tr key={log.id}><td className="border border-black p-1 text-center">{i+1}</td><td className="border border-black p-1 text-center">{formatIndoDate(log.date)}</td><td className="border border-black p-1">{log.description}</td><td className="border border-black p-1 text-center font-bold text-green-600">{log.value}</td></tr>
+                        )) : <tr><td colSpan="4" className="border border-black p-2 text-center italic">Nihil.</td></tr>}
                     </tbody>
                 </table>
             </div>
 
-            {/* C. RIWAYAT LAYANAN BK (OPSIONAL) */}
+            {/* C. KONSELING (MODIFIKASI: LEBIH RAPAT & KOLOM LEBAR) */}
             {showCounselingHistory && (
-                <div className="mb-8">
-                    <h3 className="font-bold text-sm uppercase border-b border-black pb-1 mb-2 flex items-center gap-2 text-blue-800">
-                        <FileText size={16}/> C. Riwayat Layanan Bimbingan Konseling
-                    </h3>
-                    
-                    {/* INFO MODE PRIVASI */}
-                    {counselingPrivacy === 'mask' && (
-                        <p className="text-[10px] italic mb-2 text-slate-500">*Topik yang bersifat privasi disamarkan pada dokumen ini.</p>
-                    )}
-                    {counselingPrivacy === 'hide' && (
-                        <p className="text-[10px] italic mb-2 text-slate-500">*Layanan yang bersifat privasi tidak ditampilkan pada dokumen ini.</p>
-                    )}
-                    
-                    <table className="w-full border-collapse border border-black text-xs">
+                <div className="mb-6">
+                    <h3 className="font-bold text-[10pt] uppercase border-b border-black pb-1 mb-2 text-blue-800">C. Riwayat Layanan Bimbingan Konseling</h3>
+                    {counselingPrivacy === 'mask' && <p className="text-[8pt] italic mb-1 text-slate-500">*Topik privasi disamarkan.</p>}
+                    <table className="w-full border-collapse border border-black text-[9pt] compact-table">
                         <thead>
-                            <tr className="bg-slate-100 text-center">
-                                <th className="border border-black p-1.5 w-8">No</th>
-                                <th className="border border-black p-1.5 w-24">Tanggal</th>
-                                <th className="border border-black p-1.5 w-48">Jenis & Detail Layanan</th> <th className="border border-black p-1.5">Topik / Masalah</th> <th className="border border-black p-1.5 w-32">Tindak Lanjut</th>
-                            </tr>
+                            <tr className="bg-slate-100 text-center"><th className="border border-black p-1 w-8">No</th><th className="border border-black p-1 w-20">Tanggal</th><th className="border border-black p-1 w-56">Layanan</th><th className="border border-black p-1">Masalah</th><th className="border border-black p-1 w-32">TL</th></tr>
                         </thead>
                         <tbody>
-                            {counselingHistory.length > 0 ? counselingHistory.map((h, i) => {
-                                // LOGIKA TAMPILAN PRIVASI
+                            {counselingHistory.length>0 ? counselingHistory.map((h,i)=>{
                                 const isPrivate = h.isPrivate || (h.serviceType && h.serviceType.toLowerCase().includes('pribadi'));
-                                const isMasked = isPrivate && counselingPrivacy === 'mask';
-                                
+                                const isMasked = isPrivate && counselingPrivacy==='mask';
                                 return (
                                     <tr key={h.id}>
-                                        <td className="border border-black p-1.5 text-center">{i+1}</td>
-                                        <td className="border border-black p-1.5 text-center">{formatIndoDate(h.date)}</td>
-                                        
+                                        {/* Padding dibuat sangat rapat: px-1 py-0.5 */}
+                                        <td className="border border-black px-1 py-0.5 text-center">{i+1}</td>
+                                        <td className="border border-black px-1 py-0.5 text-center">{formatIndoDate(h.date)}</td>
                                         {/* KOLOM GABUNGAN (JENIS LAYANAN & DETAIL) */}
-                                        <td className="border border-black p-1.5 text-left align-top">
-                                            <div className="font-bold underline mb-1 flex items-center gap-1">
+                                        <td className="border border-black px-1 py-0.5 text-left align-top">
+                                            {/* Margin bottom dikurangi */}
+                                            <div className="font-bold underline mb-0 flex items-center gap-1">
                                                 {h.serviceType}
                                                 {/* Indikator gembok jika privasi */}
                                                 {isPrivate && <Lock size={10} className="text-red-500" />}
                                             </div>
-                                            <div className="text-[10px] space-y-1">
+                                            {/* Line height dirapatkan, margin dihapus */}
+                                            <div className="text-[8pt] leading-tight">
                                                 <div><span className="font-bold">Bidang:</span> {h.skkpd || '-'}</div>
                                                 <div><span className="font-bold">Kategori:</span> {h.category || '-'}</div>
                                                 <div><span className="font-bold">Teknik:</span> {h.technique || '-'}</div>
                                             </div>
                                         </td>
-
+                                        
                                         {/* KOLOM TOPIK (MASKING) */}
-                                        <td className="border border-black p-1.5 text-left align-top">
-                                            <div className={`text-sm ${isMasked ? 'italic text-gray-400' : ''}`}>
+                                        <td className="border border-black px-1 py-0.5 text-left align-top">
+                                            <div className={`text-sm ${isMasked ? 'italic text-gray-400' : ''} leading-tight`}>
                                                 {isMasked ? '--- Privasi (Disamarkan) ---' : h.description}
                                             </div>
                                         </td>
-
-                                        <td className="border border-black p-1.5 align-top">{h.followUp}</td>
+                                        
+                                        <td className="border border-black px-1 py-0.5 align-top leading-tight">{h.followUp}</td>
                                     </tr>
-                                );
-                            }) : (
-                                <tr><td colSpan="5" className="border border-black p-4 text-center italic">
-                                    {counselingPrivacy === 'hide' && counselingHistory.length === 0 
-                                        ? "Belum ada riwayat layanan publik (data privasi disembunyikan)."
-                                        : "Belum ada riwayat layanan."
-                                    }
-                                </td></tr>
-                            )}
+                                )
+                            }) : <tr><td colSpan="5" className="border border-black p-2 text-center italic">Belum ada riwayat.</td></tr>}
                         </tbody>
                     </table>
                 </div>
             )}
 
             {/* TANDA TANGAN */}
-            <div className="grid grid-cols-2 gap-10 mt-12 text-center text-sm font-serif signature-section break-inside-avoid">
+            <div className="grid grid-cols-2 gap-10 mt-12 text-center text-[10pt] signature-section break-inside-avoid">
                 <div>
                     <p>Mengetahui,</p>
                     <p>Orang Tua / Wali</p>
                     <br/><br/><br/><br/>
-                    <p className="font-bold underline">
-                        ( {student.parent ? student.parent : '....................................'} )
-                    </p>
+                    <p className="font-bold underline">( {student.parent || '....................................'} )</p>
                 </div>
                 <div>
                     <p>{settings?.city || '...'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
