@@ -18,15 +18,16 @@ const InputGroup = ({ label, value, onChange, placeholder, required, type="text"
 );
 
 const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
-    // Default State
+    // Default State (Ditambah guardianTeacherNip dan googleMapsLink)
     const defaultState = { 
         nisn: '', name: '', class: '', gender: 'L', 
-        pob: '', dob: '', address: '', phone: '',
+        pob: '', dob: '', address: '', googleMapsLink: '', phone: '',
         fatherName: '', fatherJob: '', fatherPhone: '', fatherDeceased: false,
         motherName: '', motherJob: '', motherPhone: '', motherDeceased: false,
         parent: '', parentPhone: '', jobParent: '', 
         career: '', riskLevel: 'LOW',
-        homeroomTeacher: '', homeroomTeacherNip: '', guardianTeacher: ''  
+        homeroomTeacher: '', homeroomTeacherNip: '', 
+        guardianTeacher: '', guardianTeacherNip: ''  
     };
 
     const [formData, setFormData] = useState(defaultState);
@@ -113,11 +114,19 @@ const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
                             <InputGroup label="Kelas" value={formData.class} onChange={e=>setFormData({...formData, class: e.target.value})} required placeholder="X-1"/>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <InputGroup label="Wali Kelas" value={formData.homeroomTeacher} onChange={e=>setFormData({...formData, homeroomTeacher: e.target.value})} placeholder="Nama Wali Kelas"/>
-                        <InputGroup label="NIP Wali Kelas" value={formData.homeroomTeacherNip} onChange={e=>setFormData({...formData, homeroomTeacherNip: e.target.value})} placeholder="NIP (Opsional)"/>
-                        <InputGroup label="Guru Wali / Pendamping" value={formData.guardianTeacher} onChange={e=>setFormData({...formData, guardianTeacher: e.target.value})} placeholder="Nama Guru Wali"/>
+                    
+                    {/* BAGIAN DATA GURU WALI */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <InputGroup label="Wali Kelas" value={formData.homeroomTeacher} onChange={e=>setFormData({...formData, homeroomTeacher: e.target.value})} placeholder="Nama Wali Kelas"/>
+                            <InputGroup label="NIP Wali Kelas" value={formData.homeroomTeacherNip} onChange={e=>setFormData({...formData, homeroomTeacherNip: e.target.value})} placeholder="NIP (Opsional)"/>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <InputGroup label="Guru Pendamping" value={formData.guardianTeacher} onChange={e=>setFormData({...formData, guardianTeacher: e.target.value})} placeholder="Nama Pendamping"/>
+                            <InputGroup label="NIP Pendamping" value={formData.guardianTeacherNip} onChange={e=>setFormData({...formData, guardianTeacherNip: e.target.value})} placeholder="NIP (Opsional)"/>
+                        </div>
                     </div>
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
                             <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Jenis Kelamin</label>
@@ -127,7 +136,12 @@ const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
                         <InputGroup label="Tanggal Lahir" type="date" value={formData.dob} onChange={e=>setFormData({...formData, dob: e.target.value})} />
                         <InputGroup label="No HP Siswa" value={formData.phone} onChange={e=>setFormData({...formData, phone: e.target.value})} placeholder="08xxx"/>
                     </div>
-                    <InputGroup label="Alamat Lengkap" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Jalan, Desa, Kecamatan..."/>
+
+                    {/* BAGIAN ALAMAT & GOOGLE MAPS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InputGroup label="Alamat Lengkap" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Jalan, Desa, Kecamatan..."/>
+                        <InputGroup label="Link Google Maps (Home Visit)" value={formData.googleMapsLink} onChange={e=>setFormData({...formData, googleMapsLink: e.target.value})} placeholder="https://maps.app.goo.gl/... (Opsional)"/>
+                    </div>
                 </div>
 
                 {/* ORANG TUA */}

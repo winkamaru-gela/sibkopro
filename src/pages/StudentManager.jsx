@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { 
     Users, X, ArrowRightLeft, Upload, PlusCircle, 
     Search, MoreVertical, ChevronDown, Download, ChevronLeft, ChevronRight,
-    AlertCircle, CheckCircle, Settings, Power 
+    AlertCircle, CheckCircle, Settings, Power, FileSpreadsheet 
 } from 'lucide-react';
 import * as XLSX from 'xlsx'; 
 import { parseImportDate } from '../utils/helpers';
@@ -22,7 +22,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
     const [showMobileMenu, setShowMobileMenu] = useState(false); 
     
     // --- FITUR CERDAS (DETEKTOR) ---
-    const [isDetectorEnabled, setIsDetectorEnabled] = useState(true); // Default: Aktif
+    const [isDetectorEnabled, setIsDetectorEnabled] = useState(true);
     const [showMissingClassOnly, setShowMissingClassOnly] = useState(false); 
 
     // --- STATE PAGINATION ---
@@ -42,28 +42,22 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
         return [...new Set((students || []).map(s => s.class).filter(Boolean))].sort();
     }, [students]);
 
-    // 1. FITUR CERDAS: Hitung siswa tanpa kelas (Hanya jika Enabled)
     const missingClassCount = useMemo(() => {
-        if (!isDetectorEnabled) return 0; // Jika dimatikan, return 0
+        if (!isDetectorEnabled) return 0;
         return (students || []).filter(s => !s.class || s.class.trim() === '').length;
     }, [students, isDetectorEnabled]);
 
-    // 2. LOGIKA FILTER UTAMA
     const filteredStudents = useMemo(() => {
         return (students || []).filter(s => {
-            // Prioritas 1: Jika Mode "Cek Data Kosong" aktif
             if (showMissingClassOnly && isDetectorEnabled) {
                 return !s.class || s.class.trim() === '';
             }
-
-            // Prioritas 2: Filter Normal
             const matchSearch = 
                 s.name.toLowerCase().includes(search.toLowerCase()) || 
                 (s.class && s.class.toLowerCase().includes(search.toLowerCase())) ||
                 (s.nisn && s.nisn.includes(search));
             
             const matchClass = filterClass ? s.class === filterClass : true;
-            
             return matchSearch && matchClass;
         });
     }, [students, search, filterClass, showMissingClassOnly, isDetectorEnabled]);
@@ -71,7 +65,6 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
     // --- LOGIC PAGINATION ---
     const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
 
-    // Reset halaman jika filter berubah
     useEffect(() => { setCurrentPage(1); }, [search, filterClass, showMissingClassOnly]);
 
     const paginatedStudents = useMemo(() => {
@@ -113,26 +106,54 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
             setIsMoveMode(false);
             setSelectedIds([]);
             setTargetClass('');
-            // Jika kita sedang di mode perbaikan data, matikan modenya setelah selesai
             if(showMissingClassOnly && missingClassCount <= selectedIds.length) {
                 setShowMissingClassOnly(false);
             }
         }
     };
 
-    // --- EXCEL LOGIC ---
+    // --- EXCEL LOGIC (TEMPLATE, EXPORT, IMPORT) ---
+
+    // 1. Download Template Kosong
+    const handleDownloadTemplate = () => {
+        const templateData = [{
+            "NISN": "0012345678", "Nama Lengkap": "Contoh Nama Siswa", "Kelas": "X-1", 
+            "Jenis Kelamin (L/P)": "L", "Tempat Lahir": "Jakarta", "Tanggal Lahir (YYYY-MM-DD)": "2008-08-17", 
+            "No HP Siswa": "081234567890", "Alamat Lengkap": "Jl. Pendidikan No. 1", "Link Google Maps": "https://maps.google.com/...",
+            "Wali Kelas": "Budi Santoso, S.Pd", "NIP Wali Kelas": "198001012005011001", 
+            "Guru Pendamping": "Siti Aminah, S.Pd", "NIP Guru Pendamping": "198502022010012002",
+            "Nama Ayah": "Nama Ayah", "Pekerjaan Ayah": "PNS", "No HP Ayah": "0811111111", "Ayah Meninggal (Y/T)": "T",
+            "Nama Ibu": "Nama Ibu", "Pekerjaan Ibu": "Wiraswasta", "No HP Ibu": "0822222222", "Ibu Meninggal (Y/T)": "T",
+            "Nama Wali Utama": "Nama Ayah", "Pekerjaan Wali": "PNS", "No HP Wali": "0811111111", 
+            "Cita-cita / Karir": "Dokter", "Tingkat Kerawanan (LOW/MEDIUM/HIGH)": "LOW"
+        }];
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Template Siswa");
+        XLSX.writeFile(wb, "Template_Import_Siswa.xlsx");
+    };
+
+    // 2. Export Data Lengkap
     const handleExportData = () => {
         if (filteredStudents.length === 0) return alert("Tidak ada data siswa untuk diekspor.");
         const dataToExport = filteredStudents.map(s => ({
-            "NISN": s.nisn, "Nama Lengkap": s.name, "Kelas": s.class, 
-            "L/P": s.gender, "No HP": s.phone, "Wali": s.parent
+            "NISN": s.nisn || '', "Nama Lengkap": s.name || '', "Kelas": s.class || '', 
+            "Jenis Kelamin (L/P)": s.gender || 'L', "Tempat Lahir": s.pob || '', "Tanggal Lahir (YYYY-MM-DD)": s.dob || '', 
+            "No HP Siswa": s.phone || '', "Alamat Lengkap": s.address || '', "Link Google Maps": s.googleMapsLink || '',
+            "Wali Kelas": s.homeroomTeacher || '', "NIP Wali Kelas": s.homeroomTeacherNip || '', 
+            "Guru Pendamping": s.guardianTeacher || '', "NIP Guru Pendamping": s.guardianTeacherNip || '',
+            "Nama Ayah": s.fatherName || '', "Pekerjaan Ayah": s.fatherJob || '', "No HP Ayah": s.fatherPhone || '', "Ayah Meninggal (Y/T)": s.fatherDeceased ? 'Y' : 'T',
+            "Nama Ibu": s.motherName || '', "Pekerjaan Ibu": s.motherJob || '', "No HP Ibu": s.motherPhone || '', "Ibu Meninggal (Y/T)": s.motherDeceased ? 'Y' : 'T',
+            "Nama Wali Utama": s.parent || '', "Pekerjaan Wali": s.jobParent || '', "No HP Wali": s.parentPhone || '', 
+            "Cita-cita / Karir": s.career || '', "Tingkat Kerawanan (LOW/MEDIUM/HIGH)": s.riskLevel || 'LOW'
         }));
         const ws = XLSX.utils.json_to_sheet(dataToExport);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Data Siswa");
-        XLSX.writeFile(wb, "Data_Siswa_SIBKO.xlsx");
+        XLSX.writeFile(wb, "Backup_Data_Siswa.xlsx");
     };
 
+    // 3. Import File & Map Data
     const handleImportFile = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -142,18 +163,48 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                 const bstr = evt.target.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
                 const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); 
+                
                 const newStudents = jsonData.map(row => ({
                     nisn: row["NISN"] ? String(row["NISN"]) : '',
-                    name: row["Nama Lengkap"],
-                    class: row["Kelas"], // Jika Excel kosong, ini akan undefined
-                    gender: row["L/P"],
-                    parent: row["Wali"],
-                    phone: row["No HP"]
-                }));
-                if (newStudents.length > 0 && confirm(`Import ${newStudents.length} siswa?`)) onImport(newStudents);
-            } catch (error) { console.error(error); alert("Gagal membaca file Excel."); }
+                    name: row["Nama Lengkap"] || '',
+                    class: row["Kelas"] || '', 
+                    gender: row["Jenis Kelamin (L/P)"] === 'P' ? 'P' : 'L',
+                    pob: row["Tempat Lahir"] || '',
+                    dob: row["Tanggal Lahir (YYYY-MM-DD)"] ? String(row["Tanggal Lahir (YYYY-MM-DD)"]) : '',
+                    phone: row["No HP Siswa"] ? String(row["No HP Siswa"]) : '',
+                    address: row["Alamat Lengkap"] || '',
+                    googleMapsLink: row["Link Google Maps"] || '',
+                    homeroomTeacher: row["Wali Kelas"] || '',
+                    homeroomTeacherNip: row["NIP Wali Kelas"] ? String(row["NIP Wali Kelas"]) : '',
+                    guardianTeacher: row["Guru Pendamping"] || '',
+                    guardianTeacherNip: row["NIP Guru Pendamping"] ? String(row["NIP Guru Pendamping"]) : '',
+                    fatherName: row["Nama Ayah"] || '',
+                    fatherJob: row["Pekerjaan Ayah"] || '',
+                    fatherPhone: row["No HP Ayah"] ? String(row["No HP Ayah"]) : '',
+                    fatherDeceased: row["Ayah Meninggal (Y/T)"] === 'Y',
+                    motherName: row["Nama Ibu"] || '',
+                    motherJob: row["Pekerjaan Ibu"] || '',
+                    motherPhone: row["No HP Ibu"] ? String(row["No HP Ibu"]) : '',
+                    motherDeceased: row["Ibu Meninggal (Y/T)"] === 'Y',
+                    parent: row["Nama Wali Utama"] || '',
+                    jobParent: row["Pekerjaan Wali"] || '',
+                    parentPhone: row["No HP Wali"] ? String(row["No HP Wali"]) : '',
+                    career: row["Cita-cita / Karir"] || '',
+                    riskLevel: row["Tingkat Kerawanan (LOW/MEDIUM/HIGH)"] || 'LOW'
+                })).filter(s => s.name); // Filter baris yang benar-benar ada namanya
+
+                if (newStudents.length > 0 && confirm(`Berhasil membaca ${newStudents.length} data siswa. Lanjutkan Import?`)) {
+                    onImport(newStudents);
+                } else if (newStudents.length === 0) {
+                    alert("Tidak ada data valid yang ditemukan pada Excel.");
+                }
+            } catch (error) { 
+                console.error(error); 
+                alert("Gagal membaca file Excel. Pastikan format sesuai dengan Template."); 
+            }
         };
-        reader.readAsBinaryString(file); e.target.value = null; 
+        reader.readAsBinaryString(file); 
+        e.target.value = null; // Reset input
     };
 
     // Toggle Mode Cek Data
@@ -163,7 +214,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
             setIsMoveMode(false); 
         } else {
             setShowMissingClassOnly(true);
-            setSearchTerm('');
+            setSearch('');
             setFilterClass('');
         }
     };
@@ -171,7 +222,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
     // Toggle Enable/Disable Detektor
     const toggleDetector = () => {
         setIsDetectorEnabled(!isDetectorEnabled);
-        if (isDetectorEnabled) setShowMissingClassOnly(false); // Matikan mode filter jika didisable
+        if (isDetectorEnabled) setShowMissingClassOnly(false); 
     };
 
     return (
@@ -183,7 +234,6 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                         <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
                             <Users className="text-blue-600"/> Data Siswa
                         </h2>
-                        {/* TOGGLE DETECTOR BUTTON */}
                         <button 
                             onClick={toggleDetector}
                             className={`p-1.5 rounded-lg transition-colors ${isDetectorEnabled ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}
@@ -193,7 +243,6 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                         </button>
                     </div>
                     
-                    {/* BUTTON SMART DETECTOR (MOBILE) */}
                     {missingClassCount > 0 && isDetectorEnabled && (
                         <button onClick={toggleMissingDataMode} className={`md:hidden p-2 rounded-full ${showMissingClassOnly ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-600 animate-pulse'}`}>
                             <AlertCircle size={20}/>
@@ -216,7 +265,6 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                         </div>
                     ) : (
                         <>
-                            {/* --- SMART FEATURE: DETEKTOR DATA KOSONG (DESKTOP) --- */}
                             {isDetectorEnabled && (
                                 missingClassCount > 0 ? (
                                     <button 
@@ -226,20 +274,17 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                                             ? 'bg-orange-600 text-white border-orange-600 shadow-md' 
                                             : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
                                         }`}
-                                        title={showMissingClassOnly ? "Kembali ke semua data" : "Klik untuk melihat data yang perlu diperbaiki"}
                                     >
                                         <AlertCircle size={18} className={!showMissingClassOnly ? "animate-pulse" : ""}/>
                                         {showMissingClassOnly ? "Keluar Mode Perbaikan" : `${missingClassCount} Belum Ada Kelas`}
                                     </button>
                                 ) : (
-                                    // Indikator Data Aman
                                     <div className="hidden md:flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold text-green-700 bg-green-50 border border-green-200 cursor-default" title="Semua siswa sudah memiliki kelas">
                                         <CheckCircle size={16}/> Data Kelas Lengkap
                                     </div>
                                 )
                             )}
 
-                            {/* DROPDOWN FILTER KELAS */}
                             {!showMissingClassOnly && (
                                 <div className="relative w-full md:w-auto">
                                     <select className="w-full md:w-36 pl-3 pr-8 py-2.5 border rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer font-medium text-slate-600" value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
@@ -250,7 +295,6 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                                 </div>
                             )}
 
-                            {/* SEARCH BAR */}
                             <div className="relative w-full md:w-56">
                                 <Search className="text-slate-400 absolute left-3 top-2.5" size={18}/>
                                 <input className="w-full pl-10 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-colors" placeholder="Cari nama, NISN..." value={search} onChange={e=>setSearch(e.target.value)} disabled={showMissingClassOnly}/>
@@ -259,9 +303,13 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                             {/* TOMBOL AKSI LAINNYA */}
                             <div className="hidden md:flex gap-2">
                                 <button onClick={() => setIsMoveMode(true)} className="bg-orange-100 text-orange-700 hover:bg-orange-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors" title="Pindah Kelas Massal"><ArrowRightLeft size={18}/></button>
-                                <button onClick={handleExportData} className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors"><Download size={18}/></button>
+                                
+                                {/* TOMBOL BARU: DOWNLOAD TEMPLATE */}
+                                <button onClick={handleDownloadTemplate} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors" title="Download Template Excel"><FileSpreadsheet size={18}/></button>
+                                
+                                <button onClick={handleExportData} className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors" title="Export Backup Data"><Download size={18}/></button>
                                 <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportFile} />
-                                <button onClick={() => fileInputRef.current.click()} className="bg-green-600 text-white hover:bg-green-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors"><Upload size={18}/></button>
+                                <button onClick={() => fileInputRef.current.click()} className="bg-green-600 text-white hover:bg-green-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors" title="Import Data dari Excel"><Upload size={18}/></button>
                                 <button onClick={() => { setEditingData(null); setShowForm(!showForm); }} className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors"><PlusCircle size={18}/> {showForm ? 'Batal' : 'Tambah'}</button>
                             </div>
                         </>
@@ -295,6 +343,7 @@ const StudentManager = ({ students, journals, pointLogs, sanctionRules, user, on
                         <button onClick={() => { toggleMissingDataMode(); setShowMobileMenu(false); }} className="col-span-2 bg-orange-100 text-orange-700 py-3 rounded-lg font-bold flex items-center justify-center gap-2 border border-orange-200"><AlertCircle size={20}/> {showMissingClassOnly ? 'Keluar Mode Perbaikan' : `Perbaiki ${missingClassCount} Data Kosong`}</button>
                     )}
                     <button onClick={() => {setIsMoveMode(true); setShowMobileMenu(false);}} className="flex flex-col items-center gap-1 p-3 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold border border-orange-100"><ArrowRightLeft size={20}/> Pindah Kelas</button>
+                    <button onClick={handleDownloadTemplate} className="flex flex-col items-center gap-1 p-3 bg-slate-50 text-slate-700 rounded-lg text-xs font-bold border border-slate-100"><FileSpreadsheet size={20}/> Template Excel</button>
                     <button onClick={handleExportData} className="flex flex-col items-center gap-1 p-3 bg-green-50 text-green-700 rounded-lg text-xs font-bold border border-green-100"><Download size={20}/> Export Data</button>
                     <button onClick={() => fileInputRef.current.click()} className="col-span-2 flex items-center justify-center gap-2 p-3 bg-green-50 text-green-700 rounded-lg text-xs font-bold border border-green-100"><Upload size={18}/> Import Excel</button>
                 </div>
