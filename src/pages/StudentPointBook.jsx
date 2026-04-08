@@ -1,4 +1,3 @@
-// src/pages/StudentPointBook.jsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
@@ -15,7 +14,8 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-900/95 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm print:bg-white print:static">
+        // PERBAIKAN: Menambahkan print:block print:w-full print:h-auto
+        <div className="fixed inset-0 z-[9999] bg-slate-900/95 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm print:bg-white print:static print:block print:w-full print:h-auto">
             
             {/* --- CSS ISOLASI CETAK --- */}
             <style>{`
@@ -29,17 +29,48 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
 
                     html, body { 
                         height: auto !important; 
+                        min-height: auto !important;
                         overflow: visible !important; 
                         background-color: white !important; 
                         margin: 0 !important;
+                        padding: 0 !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
-                    .print-portal-root { display: block !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; z-index: 9999 !important; background-color: white !important; }
-                    .print-paper-content { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
+                    
+                    /* PERBAIKAN: Mengubah position: absolute menjadi static agar browser mengenali flow halaman untuk page-break */
+                    .print-portal-root { 
+                        display: block !important; 
+                        position: static !important; 
+                        width: 100% !important; 
+                        height: auto !important; 
+                        overflow: visible !important;
+                        background-color: white !important; 
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+
+                    /* PERBAIKAN: Menghapus batasan tinggi dan memaksakan flow static */
+                    .print-paper-content { 
+                        position: static !important;
+                        box-shadow: none !important; 
+                        border: none !important; 
+                        margin: 0 !important; 
+                        padding: 0 !important; 
+                        width: 100% !important; 
+                        max-width: none !important; 
+                        height: auto !important;
+                        min-height: 0 !important;
+                        overflow: visible !important;
+                    }
+                    
                     .print-header-actions { display: none !important; }
-                    table { width: 100% !important; border-collapse: collapse !important; }
-                    tr { page-break-inside: avoid; }
+                    
+                    /* PERBAIKAN: Memastikan tabel tidak terpotong di tengah baris saat berganti kertas */
+                    table { width: 100% !important; border-collapse: collapse !important; page-break-inside: auto !important; }
+                    tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+                    thead { display: table-header-group !important; }
+                    tfoot { display: table-footer-group !important; }
                     
                     /* ATURAN GLOBAL: Semua tabel punya border saat dicetak */
                     td, th { border: 1px solid black !important; padding: 4px; }
@@ -80,8 +111,11 @@ const PrintPreviewModal = ({ isOpen, onClose, title, children }) => {
             </div>
 
             {/* Area Konten */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-slate-900/50 print:bg-white print:p-0 print:overflow-visible print-portal-root">
-                <div className="print-paper-content bg-white text-slate-900 shadow-2xl w-full max-w-[215mm] min-h-[297mm] p-10 md:p-12 origin-top h-fit mx-auto">
+            {/* PERBAIKAN: Menambahkan class print:static print:block untuk mematikan mode flex saat print */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-slate-900/50 print:bg-white print:p-0 print:overflow-visible print:block print:static print:h-auto print-portal-root">
+                
+                {/* PERBAIKAN: Menimpa kelas h-fit dan max-w dengan modifier print untuk mengizinkan kertas merentang bebas */}
+                <div className="print-paper-content bg-white text-slate-900 shadow-2xl w-full max-w-[215mm] min-h-[297mm] p-10 md:p-12 origin-top h-fit mx-auto print:max-w-none print:min-h-0 print:p-0 print:m-0 print:shadow-none print:transform-none">
                     {children}
                 </div>
             </div>
