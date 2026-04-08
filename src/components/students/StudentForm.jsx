@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { User, Users, Save, X, PlusCircle, Edit } from 'lucide-react';
 
 // Sub-component Input Sederhana
@@ -18,10 +18,13 @@ const InputGroup = ({ label, value, onChange, placeholder, required, type="text"
 );
 
 const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
-    // Default State (Ditambah locationPhotoUrl)
+    // 1. Ref untuk efek auto-scroll ke form
+    const formRef = useRef(null);
+
+    // Default State (Ditambah photoUrl)
     const defaultState = { 
         nisn: '', name: '', class: '', gender: 'L', 
-        pob: '', dob: '', address: '', googleMapsLink: '', locationPhotoUrl: '', phone: '',
+        pob: '', dob: '', address: '', googleMapsLink: '', locationPhotoUrl: '', photoUrl: '', phone: '',
         fatherName: '', fatherJob: '', fatherPhone: '', fatherDeceased: false,
         motherName: '', motherJob: '', motherPhone: '', motherDeceased: false,
         parent: '', parentPhone: '', jobParent: '', 
@@ -32,7 +35,7 @@ const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
 
     const [formData, setFormData] = useState(defaultState);
 
-    // Load data jika sedang Edit
+    // Load data jika sedang Edit + Efek Auto-Scroll
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -41,7 +44,16 @@ const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
                 fatherDeceased: !!initialData.fatherDeceased,
                 motherDeceased: !!initialData.motherDeceased
             });
+        } else {
+            setFormData(defaultState);
         }
+
+        // 2. Efek Scroll Halus
+        setTimeout(() => {
+            if (formRef.current) {
+                formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
     }, [initialData]);
 
     // --- SMART AUTO-FILL HANDLERS ---
@@ -93,7 +105,7 @@ const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
     };
 
     return (
-        <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-xl animate-in fade-in slide-in-from-top-4 relative overflow-hidden scroll-mt-20">
+        <div ref={formRef} className="bg-white p-6 rounded-xl border border-blue-200 shadow-xl animate-in fade-in slide-in-from-top-4 relative overflow-hidden scroll-mt-20">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
             <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
@@ -137,12 +149,17 @@ const StudentForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
                         <InputGroup label="No HP Siswa" value={formData.phone} onChange={e=>setFormData({...formData, phone: e.target.value})} placeholder="08xxx"/>
                     </div>
 
-                    {/* BAGIAN ALAMAT, GOOGLE MAPS & FOTO LOKASI */}
+                    {/* BAGIAN ALAMAT, MEDIA, GOOGLE MAPS & FOTO LOKASI */}
                     <div className="space-y-4 pt-2">
                         <InputGroup label="Alamat Lengkap" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Jalan, Desa, Kecamatan..."/>
+                        
+                        {/* 3. Penambahan Input Tautan Foto Profil di sini */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <InputGroup label="Link Google Maps (Home Visit)" value={formData.googleMapsLink} onChange={e=>setFormData({...formData, googleMapsLink: e.target.value})} placeholder="http://googleusercontent.com/... (Opsional)"/>
+                            <InputGroup label="Tautan Foto Profil Siswa" value={formData.photoUrl} onChange={e=>setFormData({...formData, photoUrl: e.target.value})} placeholder="https://contoh.com/foto-siswa.jpg"/>
                             <InputGroup label="Tautan Gambar Rumah / Lokasi" value={formData.locationPhotoUrl} onChange={e=>setFormData({...formData, locationPhotoUrl: e.target.value})} placeholder="https://contoh.com/gambar-rumah.jpg"/>
+                            <div className="md:col-span-2">
+                                <InputGroup label="Link Google Maps (Home Visit)" value={formData.googleMapsLink} onChange={e=>setFormData({...formData, googleMapsLink: e.target.value})} placeholder="http://googleusercontent.com/... (Opsional)"/>
+                            </div>
                         </div>
                     </div>
                 </div>

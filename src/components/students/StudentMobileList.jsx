@@ -26,21 +26,30 @@ const StudentMobileList = ({ students, isMoveMode, selectedIds, onSelectOne, onV
                                 </div>
                             )}
                             <div>
-                                <h4 className="font-bold text-slate-800 text-lg leading-tight mb-1">{student.name}</h4>
-                                <p className="text-sm text-slate-500 font-medium">{student.class} • {student.nisn}</p>
-                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                                <h3 className="font-bold text-slate-800 leading-tight mb-1">{student.name}</h3>
+                                <p className="text-xs text-slate-400 mb-2 font-medium">NISN: {student.nisn || '-'}</p>
+                                <div className="flex flex-wrap gap-2 text-[10px]">
+                                    <span className="bg-blue-50 border border-blue-100 text-blue-700 px-2 py-1 rounded font-bold">Kls {student.class || '?'}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded font-bold text-slate-600">{student.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
                                     {student.phone && <span className="bg-slate-100 px-2 py-1 rounded flex items-center gap-1">📞 {student.phone}</span>}
                                 </div>
                             </div>
                         </div>
                         
-                        {/* Action Buttons */}
+                        {/* MENGGUNAKAN e.stopPropagation() AGAR TIDAK MEMBUKA MODAL */}
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={() => onEdit(student)} className="p-2.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" title="Edit">
+                            <button 
+                                onClick={() => onEdit(student)} // MENGIRIM SELURUH DATA SISWA
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                                title="Edit"
+                            >
                                 <Edit size={18}/>
                             </button>
-                            <button onClick={() => onDelete(student.id)} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" title="Hapus">
+                            <button 
+                                onClick={() => onDelete(student.id)} 
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                                title="Hapus"
+                            >
                                 <Trash2 size={18}/>
                             </button>
                         </div>
