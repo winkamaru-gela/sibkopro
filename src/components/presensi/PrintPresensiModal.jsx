@@ -57,7 +57,7 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
 
     if (!isOpen) return null;
 
-    // --- FUNGSI GENERATE PDF (FORMAL & RAPI) ---
+    // --- FUNGSI GENERATE PDF ---
     const createPDFDoc = () => {
         const format = paperSize === 'f4' ? [215, 330] : 'a4';
         const doc = new jsPDF({ orientation, unit: 'mm', format });
@@ -91,57 +91,79 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
             currentY = 20;
         }
 
-        // 2. JUDUL DOKUMEN FORMAL
+        // 2. JUDUL DOKUMEN
         doc.setFont('helvetica', 'bold').setFontSize(12); 
         const titleText = 'LAPORAN REKAPAN PRESENSI DAN KEDISIPLINAN SISWA';
         doc.text(titleText, centerX, currentY, { align: 'center' });
         
-        // Garis Bawah Judul
         const titleWidth = doc.getTextWidth(titleText);
         doc.setLineWidth(0.3).line(centerX - titleWidth/2, currentY + 1.5, centerX + titleWidth/2, currentY + 1.5);
         
-        // Periode
         currentY += 8;
         doc.setFontSize(10);
         const monthLabel = MONTHS.find(m => m.v === selectedMonth)?.l;
         doc.text(`PERIODE: ${monthLabel.toUpperCase()} ${selectedYear}`, centerX, currentY, { align: 'center' });
         
-        // Metadata Pencetak (Kecil & Italic)
         currentY += 6;
         doc.setFont('helvetica', 'italic').setFontSize(8).setTextColor(100);
         doc.text(`Dicetak oleh: ${userName}`, centerX, currentY, { align: 'center' });
-        doc.setTextColor(0); // Reset ke hitam
+        doc.setTextColor(0); 
         
         currentY += 8;
 
-        // 3. TABEL UTAMA
+        // 3. TABEL UTAMA (AUTOFIT OTOMATIS)
         autoTable(doc, {
             startY: currentY,
             head: [["No", "Hari / Tanggal", "Nama Siswa", "Kelas", "Status", "Waktu", "Keterangan"]],
-            body: filteredLogs.map((log, index) => [
-                index + 1,
-                formatIndoDate(log.date),
-                log.studentName,
-                log.studentClass,
-                log.status,
-                `${log.jamMulai} ${log.jamSelesai ? 's/d ' + log.jamSelesai : ''}`,
-                log.keterangan || '-'
-            ]),
+            body: filteredLogs.map((log, index) => {
+                const dateObj = new Date(log.date);
+                const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                const dayName = days[dateObj.getDay()];
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const y = dateObj.getFullYear();
+                
+                return [
+                    index + 1,
+                    `${dayName}, ${d}-${m}-${y}`, // Format permintaan: Hari, DD-MM-YYYY
+                    log.studentName,
+                    log.studentClass,
+                    log.status,
+                    `${log.jamMulai} ${log.jamSelesai ? 's/d ' + log.jamSelesai : ''}`,
+                    log.keterangan || '-'
+                ];
+            }),
             theme: 'grid',
             headStyles: { 
-                fillColor: [255, 247, 237], 
+                fillColor: [240, 240, 240], 
                 textColor: [0, 0, 0], 
                 fontStyle: 'bold', 
                 halign: 'center', 
                 valign: 'middle', 
-                fontSize: 9, 
+                fontSize: 8.5, 
                 lineWidth: 0.1 
             },
-            styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 1.5, lineWidth: 0.1 },
-            margin: { left: margin, right: margin }
+            styles: { 
+                font: 'helvetica', 
+                fontSize: 8, 
+                cellPadding: 1.5, 
+                lineWidth: 0.1,
+                valign: 'middle' // Permintaan: Rata tengah vertikal
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 'wrap' }, // Nomor menyusut sesuai isi
+                1: { cellWidth: 'auto' }, // Hari/Tanggal otomatis
+                2: { cellWidth: 'auto' }, // Nama Siswa otomatis mengikuti panjang nama
+                3: { halign: 'center', cellWidth: 'wrap' }, // Kelas menyusut sesuai isi
+                4: { cellWidth: 'auto' },
+                5: { cellWidth: 'auto' },
+                6: { cellWidth: 'auto' }
+            },
+            margin: { left: margin, right: margin },
+            tableWidth: 'auto', // Membiarkan library menghitung lebar total
         });
 
-        // 4. TANDA TANGAN (LOGIKA GURU BK & KEPSEK)
+        // 4. TANDA TANGAN
         let finalY = doc.lastAutoTable.finalY + 15;
         if (finalY > pageHeight - 65) { doc.addPage(); finalY = 20; }
 
@@ -168,13 +190,12 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
             renderSigBlock('Guru BK / Konselor', userName, settings?.nipCounselor, pageWidth - 50, true);
         }
 
-        // 5. FOOTER DIGITAL SIBKO
+        // 5. FOOTER
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
             doc.setFontSize(7).setTextColor(150).setFont('helvetica', 'italic');
             const now = new Date();
-            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
             const footerText = `Dicetak dengan (SIBKo Digital) pada tanggal ${formatIndoDate(now)}.`;
             doc.text(footerText, margin, pageHeight - 8);
             doc.text(`Hal. ${i} dari ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
@@ -241,7 +262,7 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
                 </div>
             </div>
 
-            {/* BODY KONTEN */}
+            {/* BODY KONTEN PREVIEW */}
             <div className="flex-1 overflow-hidden bg-slate-100">
                 {previewUrl ? (
                     <iframe src={previewUrl} className="w-full h-full border-none shadow-inner" title="PDF Preview" />
@@ -250,7 +271,6 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
                         <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-full max-w-6xl h-fit">
                             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                                 <h4 className="font-bold text-slate-700 flex items-center gap-2"><Eye size={18} className="text-blue-600"/> Data Terpilih ({filteredLogs.length})</h4>
-                                <span className="text-xs font-black px-2 py-1 bg-blue-100 text-blue-700 rounded uppercase tracking-wider">Preview Mode</span>
                             </div>
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b">
@@ -264,20 +284,26 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {filteredLogs.map((log, idx) => (
-                                        <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4 text-center text-slate-400 font-bold">{idx + 1}</td>
-                                            <td className="px-6 py-4 font-medium">{formatIndoDate(log.date)}</td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">{log.studentName} <br/><span className="text-[10px] text-slate-400 uppercase font-bold">{log.studentClass}</span></td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${log.status.includes('Bolos') ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                    {log.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-600">{log.jamMulai}</td>
-                                            <td className="px-6 py-4 text-slate-500 italic text-xs leading-relaxed">{log.keterangan || '-'}</td>
-                                        </tr>
-                                    ))}
+                                    {filteredLogs.map((log, idx) => {
+                                        const dateObj = new Date(log.date);
+                                        const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                                        const d = String(dateObj.getDate()).padStart(2, '0');
+                                        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                        return (
+                                            <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                                <td className="px-6 py-4 font-medium">{days[dateObj.getDay()]}, {d}-{m}-{dateObj.getFullYear()}</td>
+                                                <td className="px-6 py-4 font-bold text-slate-800">{log.studentName} <br/><span className="text-[10px] text-slate-400 uppercase font-bold">{log.studentClass}</span></td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${log.status.includes('Bolos') ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                        {log.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 font-mono text-xs font-bold text-slate-600">{log.jamMulai}</td>
+                                                <td className="px-6 py-4 text-slate-500 italic text-xs leading-relaxed">{log.keterangan || '-'}</td>
+                                            </tr>
+                                        );
+                                    })}
                                     {filteredLogs.length === 0 && (
                                         <tr><td colSpan="6" className="p-24 text-center">
                                             <div className="flex flex-col items-center gap-3 text-slate-400">
