@@ -27,6 +27,7 @@ import StudentPointBook from './pages/StudentPointBook';
 import SanctionBook from './pages/SanctionBook';
 import CounselingHistory from './pages/CounselingHistory';
 import LetterManager from './pages/LetterManager';
+import PresensiSiswa from './pages/presensi/PresensiSiswa';
 
 export default function App() {
     const [authUser, setAuthUser] = useState(null); 
@@ -239,6 +240,7 @@ export default function App() {
                             ) : (
                                 <>
                                     <Route path="/" element={<GuruDashboard students={students} journals={journals} user={appUser} pointLogs={pointLogs} settings={mySettings} />} />
+                                    <Route path="/presensi" element={<PresensiSiswa user={appUser} students={students} settings={mySettings}/>} />
                                     <Route path="/students" element={
                                         <StudentManager 
                                             students={students} journals={journals} pointLogs={pointLogs} sanctionRules={sanctionRules} user={appUser}

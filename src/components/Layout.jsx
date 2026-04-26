@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { 
     Home, Users, BookOpen, Printer, Settings, UserCog, LogOut, 
     X, List, Trophy, Database, ChevronDown, ChevronRight, School,
-    BookUser, Gavel, ClipboardList, Briefcase, Mail 
+    BookUser, Gavel, ClipboardList, Briefcase, Mail, Clock 
 } from 'lucide-react';
 
 const Layout = ({ children, userRole, userName, onLogout }) => {
@@ -54,6 +54,7 @@ const Layout = ({ children, userRole, userName, onLogout }) => {
             { 
                 id: 'bk_services', label: 'Layanan BK', icon: Briefcase, 
                 children: [
+                    { id: 'presensi', label: 'Presensi Siswa', icon: Clock, path: '/presensi' },
                     { id: 'points', label: 'Catat Poin Siswa', icon: Trophy, path: '/points' }, 
                     { id: 'point_book', label: 'Buku Poin Siswa', icon: BookUser, path: '/point-book' },
                     { id: 'sanction_book', label: 'Buku Sanksi Siswa', icon: Gavel, path: '/sanction-book' },
