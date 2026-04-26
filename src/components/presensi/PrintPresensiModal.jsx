@@ -235,7 +235,7 @@ const PrintPresensiModal = ({ isOpen, onClose, logs = [], settings, userName }) 
                             <button onClick={() => createPDFDoc().save(`Laporan_Presensi_${MONTHS.find(m=>m.v===selectedMonth).l}.pdf`)} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md active:scale-95 transition-all"><Download size={18}/> Simpan PDF</button>
                         </>
                     ) : (
-                        <button onClick={handlePreview} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all active:scale-95 shadow-sm border border-blue-200"><Printer size={18}/> Cetak Laporan</button>
+                        <button onClick={handlePreview} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all active:scale-95 shadow-sm border border-blue-200"><Printer size={18}/> Cetak Rekapan</button>
                     )}
                     <button onClick={onClose} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-full transition-colors ml-2"><X size={28}/></button>
                 </div>

@@ -73,10 +73,10 @@ export default function PresensiSiswa({ user, students, settings }) {
                 
                 <div className="flex items-center gap-2">
                     <button onClick={() => setIsPrintOpen(true)} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 transition-colors">
-                        <Printer size={16} /> Cetak Laporan
+                        <Printer size={16} /> Cetak
                     </button>
                     <button onClick={() => setIsMasterOpen(true)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-slate-300">
-                        <Settings size={16} /> Setting Jam
+                        <Settings size={16} /> Setting Jam Pembelajaran
                     </button>
                     <button onClick={() => { setEditingLog(null); setIsFormOpen(true); }} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md">
                         <Plus size={16} /> Catat Presensi
